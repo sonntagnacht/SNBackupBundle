@@ -65,15 +65,30 @@ class DumpCommand extends ContainerAwareCommand
             $gaufrette = $this->getContainer()->get('knp_gaufrette.filesystem_map');
 
             foreach ($gaufrette as $folder => $gfs) {
+
+                $fs->mkdir(sprintf("%s/%s",
+                    $tempFolder,
+                    $folder));
+                /**
+                 * @var $gfs \Gaufrette\Filesystem
+                 */
                 $files = $gfs->keys();
+
                 foreach ($files as $file) {
-                    $data = $gfs->read($file);
-                    $fs->dumpFile(
-                        sprintf("%s/%s/%s",
+                    if ($gfs->isDirectory($file)) {
+                        $fs->mkdir(sprintf("%s/%s/%s",
                             $tempFolder,
                             $folder,
-                            $file),
-                        $data);
+                            $file));
+                    } else {
+                        $data = $gfs->read($file);
+                        $fs->dumpFile(
+                            sprintf("%s/%s/%s",
+                                $tempFolder,
+                                $folder,
+                                $file),
+                            $data);
+                    }
                 }
             }
 
@@ -91,8 +106,9 @@ class DumpCommand extends ContainerAwareCommand
             false);
         $fs->remove($tempFolder);
 
-        $commit  = null;
-        $version = null;
+        $commit     = null;
+        $commitLong = null;
+        $version    = null;
 
         try {
             /**
@@ -103,7 +119,6 @@ class DumpCommand extends ContainerAwareCommand
             $commitLong = $sn_deploy->getCommit(false);
             $version    = $sn_deploy->getVersion();
         } catch (ServiceNotFoundException $exception) {
-
         }
 
         if (file_exists($backupFile) === true) {

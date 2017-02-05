@@ -18,7 +18,10 @@ use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Question\ConfirmationQuestion;
+use Symfony\Component\Debug\Exception\ContextErrorException;
+use Symfony\Component\DependencyInjection\Exception\ServiceNotFoundException;
 use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\Finder\Finder;
 
 class RestoreCommand extends ContainerAwareCommand
 {
@@ -98,13 +101,41 @@ class RestoreCommand extends ContainerAwareCommand
             '/^(y|j)/i');
 
         if ($helper->ask($input, $output, $question)) {
-
             CommandHelper::executeCommand($cmd, $output, false);
         }
 
+        try {
+            $gaufrette = $this->getContainer()->get('knp_gaufrette.filesystem_map');
+            $finder    = new Finder();
+
+            // Delete all Gaufrette files
+            foreach ($gaufrette as $gfs) {
+                $files = array_reverse($gfs->keys());
+                foreach ($files as $file) {
+                    $gfs->delete($file);
+                }
+            }
+
+            // Load import Gaufrette files
+            $finder->directories()->in("$extractFolder")->depth("== 0");
+            foreach ($finder as $dir) {
+                $gfs     = $gaufrette->get($dir->getRelativePathname());
+                $dFinder = Finder::create();
+                $dFinder->files()->in($dir->getRealPath());
+                foreach ($dFinder as $file) {
+                    $pathname = $file->getRelativePathname();
+                    $content  = $file->getContents();
+                    $gfs->write($pathname, $content, true);
+                }
+            }
+
+        } catch (ServiceNotFoundException $exception) {
+            $output->writeln("No Gaufrette-FilesystemMap found!");
+        }
+
         /*} catch (ContextErrorException $exception) {
-           $output->writeln(CommandHelper::writeError("Backup not found!"));
-       }*/
+            $output->writeln(CommandHelper::writeError("Backup not found!"));
+        }*/
 
     }
 
