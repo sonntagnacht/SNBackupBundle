@@ -98,9 +98,10 @@ class DumpCommand extends ContainerAwareCommand
             /**
              * @var $sn_deploy Version
              */
-            $sn_deploy = $this->getContainer()->get('sn_deploy.twig');
-            $commit    = $sn_deploy->getCommit();
-            $version   = $sn_deploy->getVersion();
+            $sn_deploy  = $this->getContainer()->get('sn_deploy.twig');
+            $commit     = $sn_deploy->getCommit();
+            $commitLong = $sn_deploy->getCommit(false);
+            $version    = $sn_deploy->getVersion();
         } catch (ServiceNotFoundException $exception) {
 
         }
@@ -112,9 +113,10 @@ class DumpCommand extends ContainerAwareCommand
         }
 
         $dump = [
-            "timestamp" => $timestamp,
-            "commit"    => $commit,
-            "version"   => $version
+            "timestamp"   => $timestamp,
+            "commit"      => $commit,
+            "commit_long" => $commitLong,
+            "version"     => $version
         ];
 
         array_unshift($backupConfig["dumps"], $dump);

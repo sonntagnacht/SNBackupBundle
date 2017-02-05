@@ -18,7 +18,6 @@ use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Question\ConfirmationQuestion;
-use Symfony\Component\Debug\Exception\ContextErrorException;
 use Symfony\Component\Filesystem\Filesystem;
 
 class RestoreCommand extends ContainerAwareCommand
@@ -63,48 +62,49 @@ class RestoreCommand extends ContainerAwareCommand
 
         //try {
 
-            $dump = $backupConfig["dumps"][$id];
-            $fs   = new Filesystem();
-            $fs->remove($extractFolder);
-            $fs->mkdir($extractFolder);
+        $dump = $backupConfig["dumps"][$id];
+        $fs   = new Filesystem();
+        $fs->remove($extractFolder);
+        $fs->mkdir($extractFolder);
 
-            $cmd = sprintf("tar xfz %s/%s.tar.gz -C %s",
-                $backupFolder,
-                date("Y-m-d_H-i-s", $dump["timestamp"]),
-                $extractFolder
-            );
+        $cmd = sprintf("tar xfz %s/%s.tar.gz -C %s",
+            $backupFolder,
+            date("Y-m-d_H-i-s", $dump["timestamp"]),
+            $extractFolder
+        );
+
+        CommandHelper::executeCommand($cmd, $output, false);
+
+        // Database import
+        $cmd = sprintf("mysql -h %s -u %s -P %s --password='%s' %s < %s/database.sql",
+            $databaseHost,
+            $databaseUser,
+            $databasePort,
+            $databasePassword,
+            $databaseName,
+            $extractFolder
+        );
+
+        CommandHelper::executeCommand($cmd, $output, false);
+
+        // Git revert
+        $helper   = $this->getHelper('question');
+        $cmd      = sprintf("git reset --hard %s", $dump["commit_long"]);
+        $question = new ConfirmationQuestion(
+            sprintf(
+                'Do you want to execute \'%s\'? [y|<options=bold>N</>] ',
+                $cmd)
+            , false,
+            '/^(y|j)/i');
+
+        if ($helper->ask($input, $output, $question)) {
 
             CommandHelper::executeCommand($cmd, $output, false);
+        }
 
-            // Database import
-            $cmd = sprintf("mysql -h %s -u %s -P %s --password='%s' %s < %s/database.sql",
-                $databaseHost,
-                $databaseUser,
-                $databasePort,
-                $databasePassword,
-                $databaseName,
-                $extractFolder
-            );
-
-            CommandHelper::executeCommand($cmd, $output, false);
-
-            // Git revert
-            $helper   = $this->getHelper('question');
-            $question = new ConfirmationQuestion(
-                sprintf(
-                    'Do you want to checkout to commit [%s]?',
-                    $dump["commit"])
-                , false);
-
-            if ($helper->ask($input, $output, $question)) {
-                $cmd = sprintf("git checkout %s", $dump["commit"]);
-
-                CommandHelper::executeCommand($cmd, $output, false);
-            }
-
-         /*} catch (ContextErrorException $exception) {
-            $output->writeln(CommandHelper::writeError("Backup not found!"));
-        }*/
+        /*} catch (ContextErrorException $exception) {
+           $output->writeln(CommandHelper::writeError("Backup not found!"));
+       }*/
 
     }
 
