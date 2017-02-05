@@ -92,7 +92,7 @@ class RestoreCommand extends ContainerAwareCommand
         $cmd      = sprintf("git reset --hard %s", $dump["commit_long"]);
         $question = new ConfirmationQuestion(
             sprintf(
-                'Do you want to ...execute \'%s\'? [y|<options=bold>N</>] ',
+                'Do you want to execute \'%s\'? [y|<options=bold>N</>] ',
                 $cmd)
             , false,
             '/^(y|j)/i');
