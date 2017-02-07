@@ -39,12 +39,20 @@ class DumpCommand extends ContainerAwareCommand
         $fs->mkdir($tempFolder);
 
         // Get configs
-        $databaseUser     = $configs["database"]["user"];
-        $databaseHost     = $configs["database"]["host"];
-        $databasePort     = $configs["database"]["port"];
-        $databasePassword = $configs["database"]["password"];
-        $databaseName     = $configs["database"]["dbname"];
-        $backupFolder     = $configs["backup_folder"];
+        $databaseUser      = $configs["database"]["user"];
+        $databaseHost      = $configs["database"]["host"];
+        $databasePort      = $configs["database"]["port"];
+        $databasePassword  = $configs["database"]["password"];
+        $databaseName      = $configs["database"]["dbname"];
+        $backupFolder      = $configs["backup_folder"];
+        $isBackupGaufrette = false;
+
+        try {
+            $backupFolder      = $this->getContainer()->get('knp_gaufrette.filesystem_map')->get($backupFolder);
+            $isBackupGaufrette = $configs["backup_folder"];
+        } catch (\InvalidArgumentException $exception) {
+            $backupFolder = $configs["backup_folder"];
+        }
 
         if ($databasePort == null) {
             $databasePort = 3306;
@@ -64,7 +72,11 @@ class DumpCommand extends ContainerAwareCommand
         try {
             $gaufrette = $this->getContainer()->get('knp_gaufrette.filesystem_map');
 
+
             foreach ($gaufrette as $folder => $gfs) {
+                if ($folder == $isBackupGaufrette) {
+                    continue;
+                }
 
                 $fs->mkdir(sprintf("%s/%s",
                     $tempFolder,
@@ -96,15 +108,26 @@ class DumpCommand extends ContainerAwareCommand
             $output->writeln("No Gaufrette-FilesystemMap found!");
         }
 
-        $timestamp = time();
+        $timestamp   = time();
+        $archiveName = sprintf("%s.tar.gz", date("Y-m-d_H-i-s", $timestamp));
+        $tempArchive = sprintf("%s/%s", "/tmp", $archiveName);
         CommandHelper::executeCommand(
-            sprintf("cd %s; tar -czf %s/%s.tar.gz *",
+            sprintf("cd %s; tar -czf %s *",
                 $tempFolder,
-                $backupFolder,
-                date("Y-m-d_H-i-s", $timestamp)),
+                $tempArchive),
             $output,
             false);
         $fs->remove($tempFolder);
+
+        // Copy Backup
+        if ($isBackupGaufrette) {
+            $backupFolder->write(
+                $archiveName,
+                file_get_contents($tempArchive)
+            );
+        } else {
+            CommandHelper::executeCommand(sprintf("mv %s %s", $tempArchive, $backupFolder));
+        }
 
         $commit     = null;
         $commitLong = null;
