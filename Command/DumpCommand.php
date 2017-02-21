@@ -11,48 +11,167 @@
 namespace SN\BackupBundle\Command;
 
 
+use Gaufrette\Exception\FileNotFound;
 use SN\DeployBundle\Services\Version;
 use SN\ToolboxBundle\Helper\CommandHelper;
 use Symfony\Bundle\FrameworkBundle\Command\ContainerAwareCommand;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\DependencyInjection\Exception\ServiceNotFoundException;
 use Symfony\Component\Filesystem\Filesystem;
 
 class DumpCommand extends ContainerAwareCommand
 {
+
+    protected static $buInformations;
+    protected static $dump;
+    protected static $configs;
+
     protected function configure()
     {
         $this->setName("sn:backup:dump")
-            ->setDescription("Take a snapshot of your current application.");
+            ->setDescription("Take a snapshot of your current application.")
+            ->addOption('remote', 'r', InputOption::VALUE_OPTIONAL, 'Take a snapshot from remote Server.');
+    }
+
+    protected function copyBackupArchive($archive, $name)
+    {
+        try {
+            /**
+             * @var $fs \Gaufrette\Filesystem
+             */
+            $fs = $this->getContainer()
+                ->get('knp_gaufrette.filesystem_map')
+                ->get(self::$configs["backup_folder"]);
+            $fs->write(
+                $name,
+                file_get_contents($archive)
+            );
+            CommandHelper::executeCommand(sprintf("rm -rf %s", $archive));
+        } catch (\InvalidArgumentException $exception) {
+            CommandHelper::executeCommand(sprintf("mv %s %s", $archive, self::$configs["backup_folder"]));
+        }
+    }
+
+    /**
+     * @return mixed
+     */
+    protected function loadDumpInformations()
+    {
+        try {
+            /**
+             * @var $fs \Gaufrette\Filesystem
+             */
+            $fs = $this->getContainer()
+                ->get('knp_gaufrette.filesystem_map')
+                ->get(self::$configs["backup_folder"]);
+            try {
+                $content = $fs->read('backup.json');
+            } catch (FileNotFound $exception) {
+                $content = "";
+            }
+        } catch (\InvalidArgumentException $exception) {
+            $backupFile = sprintf("%s/backup.json", self::$configs["backup_folder"]);
+            if (file_exists($backupFile)) {
+                $content = file_get_contents($backupFile);
+            } else {
+                $content = "";
+            }
+        }
+
+        self::$buInformations = json_decode($content, true);
+
+        if (!is_array(self::$buInformations["dumps"])) {
+            self::$buInformations["dumps"] = array();
+        }
+
+        return self::$buInformations;
+    }
+
+    protected function addDumpInformations($timestamp)
+    {
+        $commit     = null;
+        $commitLong = null;
+        $version    = null;
+
+        try {
+            /**
+             * @var $sn_deploy Version
+             */
+            $sn_deploy  = $this->getContainer()->get('sn_deploy.twig');
+            $commit     = $sn_deploy->getCommit();
+            $commitLong = $sn_deploy->getCommit(false);
+            $version    = $sn_deploy->getVersion();
+        } catch (ServiceNotFoundException $exception) {
+        }
+
+        self::$dump = [
+            "timestamp"   => $timestamp,
+            "commit"      => $commit,
+            "commit_long" => $commitLong,
+            "version"     => $version
+        ];
+
+        array_unshift(self::$buInformations["dumps"], self::$dump);
+    }
+
+    protected function saveDumpInformations()
+    {
+        $content = json_encode(self::$buInformations);
+
+        try {
+            // Gaufrette filesystem
+
+            /**
+             * @var $fs \Gaufrette\Filesystem
+             */
+            $fs      = $this->getContainer()
+                ->get('knp_gaufrette.filesystem_map')
+                ->get(self::$configs["backup_folder"]);
+            $content = $fs->write("backup.json", $content, true);
+        } catch (\InvalidArgumentException $exception) {
+            // Local filesystem
+
+            /**
+             * @var $fs Filesystem
+             */
+            $fs         = new Filesystem();
+            $backupFile = sprintf("%s/backup.json", self::$configs["backup_folder"]);
+            $fs->dumpFile($backupFile, $content);
+        }
     }
 
     protected function execute(InputInterface $input, OutputInterface $output)
     {
-        $fs         = new Filesystem();
-        $configs    = $this->getContainer()->getParameter('sn_backup');
-        $tempFolder = sprintf("%s/../var/sn_backup", $this->getContainer()->get('kernel')->getRootDir());
-        $backupFile = sprintf("%s/../backup.json", $this->getContainer()->get('kernel')->getRootDir());
+        if ($input->getOption('remote') != null) {
+            $env           = $input->getOption('remote');
+            $remoteConfigs = $this->getContainer()->getParameter('sn_deploy.environments');
+            $config        = $remoteConfigs[$env];
+            CommandHelper::executeRemoteCommand('php bin/console sn:backup:dump', $config);
+
+            return;
+        }
+
+        $fs            = new Filesystem();
+        self::$configs = $this->getContainer()->getParameter('sn_backup');
+        $tempFolder    = sprintf("%s/../var/sn_backup", $this->getContainer()->get('kernel')->getRootDir());
 
         // prepare backup folder
         $fs->remove($tempFolder);
         $fs->mkdir($tempFolder);
 
         // Get configs
-        $databaseUser      = $configs["database"]["user"];
-        $databaseHost      = $configs["database"]["host"];
-        $databasePort      = $configs["database"]["port"];
-        $databasePassword  = $configs["database"]["password"];
-        $databaseName      = $configs["database"]["dbname"];
-        $backupFolder      = $configs["backup_folder"];
+        $databaseUser      = self::$configs["database"]["user"];
+        $databaseHost      = self::$configs["database"]["host"];
+        $databasePort      = self::$configs["database"]["port"];
+        $databasePassword  = self::$configs["database"]["password"];
+        $databaseName      = self::$configs["database"]["dbname"];
+        $backupFolder      = self::$configs["backup_folder"];
         $isBackupGaufrette = false;
 
-        try {
-            $backupFolder      = $this->getContainer()->get('knp_gaufrette.filesystem_map')->get($backupFolder);
-            $isBackupGaufrette = $configs["backup_folder"];
-        } catch (\InvalidArgumentException $exception) {
-            $backupFolder = $configs["backup_folder"];
-        }
+        $this->loadDumpInformations();
+
 
         if ($databasePort == null) {
             $databasePort = 3306;
@@ -119,46 +238,13 @@ class DumpCommand extends ContainerAwareCommand
             false);
         $fs->remove($tempFolder);
 
-        // Copy Backup
-        if ($isBackupGaufrette) {
-            $backupFolder->write(
-                $archiveName,
-                file_get_contents($tempArchive)
-            );
-        } else {
-            CommandHelper::executeCommand(sprintf("mv %s %s", $tempArchive, $backupFolder));
-        }
+        $this->copyBackupArchive($tempArchive, $archiveName);
+        $this->addDumpInformations($timestamp);
+        $this->saveDumpInformations();
+    }
 
-        $commit     = null;
-        $commitLong = null;
-        $version    = null;
+    protected function snapShot()
+    {
 
-        try {
-            /**
-             * @var $sn_deploy Version
-             */
-            $sn_deploy  = $this->getContainer()->get('sn_deploy.twig');
-            $commit     = $sn_deploy->getCommit();
-            $commitLong = $sn_deploy->getCommit(false);
-            $version    = $sn_deploy->getVersion();
-        } catch (ServiceNotFoundException $exception) {
-        }
-
-        if (file_exists($backupFile) === true) {
-            $backupConfig = json_decode(file_get_contents($backupFile), true);
-        } else {
-            $backupConfig = ["dumps" => array()];
-        }
-
-        $dump = [
-            "timestamp"   => $timestamp,
-            "commit"      => $commit,
-            "commit_long" => $commitLong,
-            "version"     => $version
-        ];
-
-        array_unshift($backupConfig["dumps"], $dump);
-
-        $fs->dumpFile($backupFile, json_encode($backupConfig));
     }
 }
