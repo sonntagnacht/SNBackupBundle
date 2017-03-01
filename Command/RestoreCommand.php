@@ -12,7 +12,6 @@ namespace SN\BackupBundle\Command;
 
 
 use Gaufrette\Exception\FileNotFound;
-use Gaufrette\File;
 use SN\ToolboxBundle\Helper\CommandHelper;
 use Symfony\Bundle\FrameworkBundle\Command\ContainerAwareCommand;
 use Symfony\Component\Console\Helper\Table;
@@ -28,6 +27,7 @@ use Symfony\Component\Finder\Finder;
 class RestoreCommand extends ContainerAwareCommand
 {
     protected static $configs;
+    protected $output;
 
     protected function configure()
     {
@@ -40,17 +40,85 @@ class RestoreCommand extends ContainerAwareCommand
     protected function execute(InputInterface $input, OutputInterface $output)
     {
         self::$configs = $this->getContainer()->getParameter('sn_backup');
+        $this->output  = $output;
 
-        if ($input->getOption('remote') == null) {
-            if ($input->getArgument('id') != null) {
-                $this->restoreBackup($input->getArgument('id'), $output, $input);
-            } else {
-                $content = $this->getLocalConfig();
-                $this->renderList($output, $content);
-            }
+
+        if ($input->getArgument('id') != null) {
+            $this->restoreBackup($input->getArgument('id'), $output, $input);
         } else {
-            $this->getRemoteConfig($input->getOption('remote'));
+            $this->renderList($output,
+                ($input->getOption('remote') == null) ? $this->getLocalConfig() : $this->getRemoteConfig($input->getOption('remote')));
         }
+    }
+
+    protected function getRemoteBackup($env, $id, $extractFolder)
+    {
+        $remoteConfigs = $this->getContainer()->getParameter('sn_deploy.environments');
+        $config        = $remoteConfigs[$env];
+
+        $srcFolder = CommandHelper::executeRemoteCommand(sprintf("php bin/console sn:backup:get %s", $id), $config);
+
+        $localArchive = sprintf("%s/%s.tar.gz", self::$configs['backup_folder'], $env);
+
+        if (file_exists($localArchive)) {
+            $cmd = sprintf("rm -Rf %s; mkdir %s; tar xfz %s -C %s",
+                $extractFolder,
+                $extractFolder,
+                $localArchive,
+                $extractFolder);
+
+            CommandHelper::executeCommand($cmd);
+        }
+
+        $cmd = sprintf(
+            "rsync --delete --info=progress2 -r --rsh='ssh -p %s' %s@%s:%s/* %s/",
+            $config["port"],
+            $config["user"],
+            $config["host"],
+            $srcFolder,
+            $extractFolder
+        );
+        CommandHelper::executeCommand($cmd, $this->output);
+
+        $cmd = sprintf("cd %s; tar -czf %s *",
+            $extractFolder,
+            $localArchive);
+
+        CommandHelper::executeCommand($cmd);
+
+        $this->output->writeln(CommandHelper::executeRemoteCommand(sprintf("php bin/console sn:backup:get -c %s",
+            $srcFolder),
+            $config));
+    }
+
+    protected function getLocalBackup($timestamp, $backupFolder, $extractFolder)
+    {
+        $archiveName   = sprintf("%s.tar.gz", date("Y-m-d_H-i-s", $timestamp));
+        $backupArchive = sprintf("%s/%s", $backupFolder, $archiveName);
+        $tempArchive   = sprintf("%s/%s", "/tmp", $archiveName);
+
+        try {
+            /**
+             * @var $gfs \Gaufrette\Filesystem
+             */
+            $gfs  = $this->getContainer()
+                ->get('knp_gaufrette.filesystem_map')
+                ->get(self::$configs["backup_folder"]);
+            $data = $gfs->read($archiveName);
+
+            /**
+             * @var $fs Filesystem
+             */
+            $fs->dumpFile($tempArchive, $data);
+        } catch (\InvalidArgumentException $exception) {
+            CommandHelper::executeCommand(sprintf("cp %s %s", $backupArchive, $tempArchive));
+        }
+
+        $cmd = sprintf("tar xfz %s -C %s",
+            $tempArchive,
+            $extractFolder
+        );
+        CommandHelper::executeCommand($cmd);
     }
 
     protected function restoreBackup($id, OutputInterface $output, InputInterface $input)
@@ -79,32 +147,11 @@ class RestoreCommand extends ContainerAwareCommand
         $fs->remove($extractFolder);
         $fs->mkdir($extractFolder);
 
-        $archiveName   = sprintf("%s.tar.gz", date("Y-m-d_H-i-s", $dump["timestamp"]));
-        $backupArchive = sprintf("%s/%s", $backupFolder, $archiveName);
-        $tempArchive   = sprintf("%s/%s", "/tmp", $archiveName);
-
-        try {
-            /**
-             * @var $gfs \Gaufrette\Filesystem
-             */
-            $gfs   = $this->getContainer()
-                ->get('knp_gaufrette.filesystem_map')
-                ->get(self::$configs["backup_folder"]);
-            $data = $gfs->read($archiveName);
-
-            /**
-             * @var $fs Filesystem
-             */
-            $fs->dumpFile($archiveName, $data);
-        } catch (\InvalidArgumentException $exception) {
-            CommandHelper::executeCommand(sprintf("cp %s %s", $backupArchive, $tempArchive));
+        if ($input->getOption('remote') == null) {
+            $this->getLocalBackup($dump["timestamp"], $backupFolder, $extractFolder);
+        } else {
+            $this->getRemoteBackup($input->getOption('remote'), $id, $extractFolder);
         }
-
-        $cmd = sprintf("tar xfz %s -C %s",
-            $tempArchive,
-            $extractFolder
-        );
-        CommandHelper::executeCommand($cmd);
 
         // Database import
         $cmd = sprintf("mysql -h %s -u %s -P %s --password='%s' %s < %s/database.sql",
@@ -199,7 +246,7 @@ class RestoreCommand extends ContainerAwareCommand
         $remoteConfigs = $this->getContainer()->getParameter('sn_deploy.environments');
         $config        = $remoteConfigs[$env];
 
-        return CommandHelper::executeRemoteCommand("php bin/console sn:backup:restore", $config);
+        return CommandHelper::executeRemoteCommand("php bin/console sn:backup:get", $config);
     }
 
     protected function renderList(OutputInterface $output, $configs)

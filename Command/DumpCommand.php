@@ -35,7 +35,7 @@ class DumpCommand extends ContainerAwareCommand
             ->addOption('remote', 'r', InputOption::VALUE_OPTIONAL, 'Take a snapshot from remote Server.');
     }
 
-    protected function copyBackupArchive($archive, $name)
+    protected function copyToBackup($archive, $name)
     {
         try {
             /**
@@ -89,6 +89,9 @@ class DumpCommand extends ContainerAwareCommand
         return self::$buInformations;
     }
 
+    /**
+     * @param $timestamp
+     */
     protected function addDumpInformations($timestamp)
     {
         $commit     = null;
@@ -238,13 +241,8 @@ class DumpCommand extends ContainerAwareCommand
             false);
         $fs->remove($tempFolder);
 
-        $this->copyBackupArchive($tempArchive, $archiveName);
+        $this->copyToBackup($tempArchive, $archiveName);
         $this->addDumpInformations($timestamp);
         $this->saveDumpInformations();
-    }
-
-    protected function snapShot()
-    {
-
     }
 }
