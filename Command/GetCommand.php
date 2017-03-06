@@ -89,6 +89,7 @@ class GetCommand extends ContainerAwareCommand
             /**
              * @var $fs Filesystem
              */
+            $fs = new \Symfony\Component\Filesystem\Filesystem();
             $fs->dumpFile($tempArchive, $data);
         } catch (\InvalidArgumentException $exception) {
             CommandHelper::executeCommand(sprintf("cp %s %s", $backupArchive, $tempArchive));
