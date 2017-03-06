@@ -153,6 +153,26 @@ class RestoreCommand extends ContainerAwareCommand
             $this->getRemoteBackup($input->getOption('remote'), $id, $extractFolder);
         }
 
+        $app_folder  = sprintf("%s/_app", $extractFolder);
+        $root_folder = $this->getContainer()->get('kernel')->getRootDir() . "/../";
+
+        if ($fs->exists($app_folder)) {
+            $helper   = $this->getHelper('question');
+            $cmd      = sprintf("cp -r %s %s",
+                $app_folder,
+                $root_folder);
+            $question = new ConfirmationQuestion(
+                sprintf(
+                    'Do you want restore your webfolder [y/N]? ',
+                    $cmd)
+                , false,
+                '/^(y)/i');
+
+            if ($helper->ask($input, $output, $question)) {
+                CommandHelper::executeCommand($cmd);
+            }
+        }
+
         // Database import
         $cmd = sprintf("mysql -h %s -u %s -P %s --password='%s' %s < %s/database.sql",
             $databaseHost,
@@ -164,8 +184,10 @@ class RestoreCommand extends ContainerAwareCommand
         );
         CommandHelper::executeCommand($cmd);
 
+        $cmd = "git rev-parse --is-inside-work-tree";
+
         // git reset
-        if ($dump["commit_long"] != null) {
+        if ($dump["commit_long"] != null && CommandHelper::executeCommand($cmd)) {
             $helper   = $this->getHelper('question');
             $cmd      = sprintf("git reset --hard %s", $dump["commit_long"]);
             $question = new ConfirmationQuestion(

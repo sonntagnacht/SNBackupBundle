@@ -32,7 +32,8 @@ class DumpCommand extends ContainerAwareCommand
     {
         $this->setName("sn:backup:dump")
             ->setDescription("Take a snapshot of your current application.")
-            ->addOption('remote', 'r', InputOption::VALUE_OPTIONAL, 'Take a snapshot from remote Server.');
+            ->addOption('remote', 'r', InputOption::VALUE_OPTIONAL, 'Take a snapshot from remote Server.')
+            ->addOption('full', 'f', InputOption::VALUE_NONE, 'Take a backup with webfolder.');
     }
 
     protected function copyToBackup($archive, $name)
@@ -228,6 +229,17 @@ class DumpCommand extends ContainerAwareCommand
 
         } catch (ServiceNotFoundException $exception) {
             $output->writeln("No Gaufrette-FilesystemMap found!");
+        }
+
+        if ($input->getOption('full')) {
+            $root_dir = $this->getContainer()->get('kernel')->getRootDir() . '/../';
+
+            $cmd = sprintf("mkdir %s/_app; cp -r %s %s/_app",
+                $tempFolder,
+                $root_dir,
+                $tempFolder);
+
+            CommandHelper::executeCommand($cmd);
         }
 
         $timestamp   = time();
