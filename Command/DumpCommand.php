@@ -184,7 +184,6 @@ class DumpCommand extends ContainerAwareCommand
         $databasePassword  = self::$configs["database"]["password"];
         $databaseName      = self::$configs["database"]["dbname"];
         $backupFolder      = self::$configs["backup_folder"];
-        $isBackupGaufrette = false;
 
         $this->loadDumpInformations();
 
@@ -209,7 +208,7 @@ class DumpCommand extends ContainerAwareCommand
 
 
             foreach ($gaufrette as $folder => $gfs) {
-                if ($folder == $isBackupGaufrette) {
+                if ($folder == $backupFolder) {
                     continue;
                 }
 

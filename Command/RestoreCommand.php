@@ -27,6 +27,9 @@ use Symfony\Component\Finder\Finder;
 class RestoreCommand extends ContainerAwareCommand
 {
     protected static $configs;
+    /**
+     * @var OutputInterface
+     */
     protected $output;
 
     protected function configure()
@@ -57,11 +60,13 @@ class RestoreCommand extends ContainerAwareCommand
         $remoteConfigs = $this->getContainer()->getParameter('sn_deploy.environments');
         $config        = $remoteConfigs[$env];
 
+        $this->output->writeln('Collect files of server');
         $srcFolder = CommandHelper::executeRemoteCommand(sprintf("php bin/console sn:backup:dump -c"), $config);
 
         $localArchive = sprintf("%s/%s.tar.gz", self::$configs['backup_folder'], $env);
 
         if (file_exists($localArchive)) {
+            $this->output->writeln('unpack last remote archive');
             $cmd = sprintf("rm -Rf %s; mkdir %s; tar xfz %s -C %s",
                 $extractFolder,
                 $extractFolder,
@@ -81,6 +86,12 @@ class RestoreCommand extends ContainerAwareCommand
         );
 
         CommandHelper::executeCommand($cmd, $this->output);
+
+        $cmd = sprintf("cd %s; tar -czf %s *",
+            $extractFolder,
+            $localArchive);
+
+        CommandHelper::executeCommand($cmd);
 
         CommandHelper::executeRemoteCommand(
             sprintf("php bin/console sn:backup:get -c %s", $srcFolder),
@@ -157,11 +168,14 @@ class RestoreCommand extends ContainerAwareCommand
         CommandHelper::executeCommand($cmd);
     }
 
-    protected function getRemoteCurrentConfig($env) {
+    protected function getRemoteCurrentConfig($env)
+    {
         $remoteConfigs = $this->getContainer()->getParameter('sn_deploy.environments');
         $config        = $remoteConfigs[$env];
 
-        return CommandHelper::executeRemoteCommand("php bin/console sn:backup:get c", $config);
+        return json_decode(
+            CommandHelper::executeRemoteCommand("php bin/console sn:backup:get c", $config),
+            true);
     }
 
     protected function restoreBackup($id, OutputInterface $output, InputInterface $input)
@@ -204,7 +218,7 @@ class RestoreCommand extends ContainerAwareCommand
                 $this->getRemoteCurrentBackup($env, $extractFolder);
             } else {
                 $backupConfig = json_decode($this->getRemoteConfig($env), true);
-                $dump = $backupConfig["dumps"][$id];
+                $dump         = $backupConfig["dumps"][$id];
                 $this->getRemoteBackup($env, $id, $extractFolder);
             }
         }
