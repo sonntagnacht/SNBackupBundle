@@ -106,7 +106,8 @@ class RestoreCommand extends ContainerAwareCommand
                 ->get(self::$configs["backup_folder"]);
             $fs->write(
                 $name,
-                file_get_contents($archive)
+                file_get_contents($archive),
+                true
             );
             CommandHelper::executeCommand(sprintf("rm -rf %s", $archive));
         } catch (\InvalidArgumentException $exception) {
@@ -130,6 +131,7 @@ class RestoreCommand extends ContainerAwareCommand
             /**
              * @var $fs Filesystem
              */
+            $fs = new Filesystem();
             $fs->dumpFile($tempArchive, $data);
         } catch (\InvalidArgumentException $exception) {
             CommandHelper::executeCommand(sprintf("cp %s %s", $backupArchive, $tempArchive));
