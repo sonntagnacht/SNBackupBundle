@@ -63,17 +63,14 @@ class RestoreCommand extends ContainerAwareCommand
         $this->output->writeln('Collect files of server');
         $srcFolder = CommandHelper::executeRemoteCommand(sprintf("php bin/console sn:backup:dump -c"), $config);
 
-        $localArchive = sprintf("%s/%s.tar.gz", self::$configs['backup_folder'], $env);
+        $archiveName = sprintf("%s.tar.gz", $env);
+        $tempArchive = sprintf("%s/%s", "/tmp", $archiveName);
 
-        if (file_exists($localArchive)) {
+        try{
             $this->output->writeln('unpack last remote archive');
-            $cmd = sprintf("rm -Rf %s; mkdir %s; tar xfz %s -C %s",
-                $extractFolder,
-                $extractFolder,
-                $localArchive,
-                $extractFolder);
+            $this->copyFromBackup($archiveName, $extractFolder);
+        }catch (\Exception $e) {
 
-            CommandHelper::executeCommand($cmd);
         }
 
         $cmd = sprintf(
@@ -86,16 +83,63 @@ class RestoreCommand extends ContainerAwareCommand
         );
 
         CommandHelper::executeCommand($cmd, $this->output);
+        CommandHelper::executeCommand(
+            sprintf("cd %s; tar -czf %s *",
+                $extractFolder,
+                $tempArchive));
 
-        $cmd = sprintf("cd %s; tar -czf %s *",
-            $extractFolder,
-            $localArchive);
-
-        CommandHelper::executeCommand($cmd);
+        $this->copyToBackup($tempArchive, $archiveName);
 
         CommandHelper::executeRemoteCommand(
             sprintf("php bin/console sn:backup:get -c %s", $srcFolder),
             $config);
+    }
+
+    protected function copyToBackup($archive, $name)
+    {
+        try {
+            /**
+             * @var $fs \Gaufrette\Filesystem
+             */
+            $fs = $this->getContainer()
+                ->get('knp_gaufrette.filesystem_map')
+                ->get(self::$configs["backup_folder"]);
+            $fs->write(
+                $name,
+                file_get_contents($archive)
+            );
+            CommandHelper::executeCommand(sprintf("rm -rf %s", $archive));
+        } catch (\InvalidArgumentException $exception) {
+            CommandHelper::executeCommand(sprintf("mv %s %s", $archive, self::$configs["backup_folder"]));
+        }
+    }
+
+    protected function copyFromBackup($archiveName, $extractFolder){
+        $backupArchive = sprintf("%s/%s", self::$configs["backup_folder"], $archiveName);
+        $tempArchive   = sprintf("%s/%s", "/tmp", $archiveName);
+
+        try {
+            /**
+             * @var $gfs \Gaufrette\Filesystem
+             */
+            $gfs  = $this->getContainer()
+                ->get('knp_gaufrette.filesystem_map')
+                ->get(self::$configs["backup_folder"]);
+            $data = $gfs->read($archiveName);
+
+            /**
+             * @var $fs Filesystem
+             */
+            $fs->dumpFile($tempArchive, $data);
+        } catch (\InvalidArgumentException $exception) {
+            CommandHelper::executeCommand(sprintf("cp %s %s", $backupArchive, $tempArchive));
+        }
+
+        $cmd = sprintf("tar xfz %s -C %s",
+            $tempArchive,
+            $extractFolder
+        );
+        CommandHelper::executeCommand($cmd);
     }
 
     protected function getRemoteBackup($env, $id, $extractFolder)
