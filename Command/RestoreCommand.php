@@ -202,6 +202,7 @@ class RestoreCommand extends ContainerAwareCommand
             /**
              * @var $fs Filesystem
              */
+            $fs = new Filesystem();
             $fs->dumpFile($tempArchive, $data);
         } catch (\InvalidArgumentException $exception) {
             CommandHelper::executeCommand(sprintf("cp %s %s", $backupArchive, $tempArchive));
@@ -336,6 +337,9 @@ class RestoreCommand extends ContainerAwareCommand
             // Load import Gaufrette files
             $finder->directories()->in("$extractFolder")->depth("== 0");
             foreach ($finder as $dir) {
+                if ($dir->getRelativePathname() == "_app") {
+                    continue;
+                }
                 $gfs     = $gaufrette->get($dir->getRelativePathname());
                 $dFinder = Finder::create();
                 $dFinder->files()->in($dir->getRealPath());
