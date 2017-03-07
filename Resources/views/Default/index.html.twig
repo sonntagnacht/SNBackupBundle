@@ -1,1 +1,50 @@
-Hello World!
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport"
+        content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>Backup-List</title>
+  <link href="{{ asset("bundles/snbackup/css/bootstrap.min.css") }}" rel="stylesheet"/>
+</head>
+<body>
+<nav class="navbar navbar-default">
+  <div class="container">
+    <div class="navbar-header">
+      <a class="navbar-brand" href="{{ path('backup_list') }}">SN-Backup</a>
+    </div>
+  </div>
+</nav>
+<div class="container">
+  <table class="table">
+    <thead>
+    <tr>
+      <th>ID</th>
+      <th>Timestamp</th>
+      <th>Version</th>
+      <th>Commit</th>
+      <th></th>
+    </tr>
+    </thead>
+    <tbody>
+    {% for backup in backups %}
+      <tr>
+        <td class="col-md-1">{{ loop.index0 }}</td>
+        <td class="col-md-2">{{ backup.timestamp|date("Y-m-d H:i") }}</td>
+        <td class="col-md-3">{{ backup.version }}</td>
+        <td class="col-md-4">{{ backup.commit_long }}</td>
+        <td class="col-md-2 text-right">
+          <div class="btn-group">
+            <a class="btn btn-default" href="{{ path('backup_information', {id: loop.index0 }) }}" title="Informations"><i
+                class="glyphicon glyphicon-eye-open"></i></a>
+            <a class="btn btn-default disabled" title="Restore"><i class="glyphicon glyphicon-import"></i></a>
+          </div>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+</body>
+</html>
