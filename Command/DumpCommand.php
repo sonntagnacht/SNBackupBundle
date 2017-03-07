@@ -258,7 +258,7 @@ class DumpCommand extends ContainerAwareCommand
         if ($input->getOption('current')) {
 
             $currentFolder = sprintf("/tmp/%s", md5($timestamp));
-            $cmd           = sprintf("mv %s/* %s", $tempFolder, $currentFolder);
+            $cmd           = sprintf("cp -r %s %s", $tempFolder, $currentFolder);
 
             $this->executeCommand($cmd);
             $fs->remove($tempFolder);
