@@ -157,6 +157,13 @@ class RestoreCommand extends ContainerAwareCommand
         CommandHelper::executeCommand($cmd);
     }
 
+    protected function getRemoteCurrentConfig($env) {
+        $remoteConfigs = $this->getContainer()->getParameter('sn_deploy.environments');
+        $config        = $remoteConfigs[$env];
+
+        return CommandHelper::executeRemoteCommand("php bin/console sn:backup:get c", $config);
+    }
+
     protected function restoreBackup($id, OutputInterface $output, InputInterface $input)
     {
         $extractFolder    = sprintf("%s/../var/sn_backup", $this->getContainer()->get('kernel')->getRootDir());
@@ -191,10 +198,14 @@ class RestoreCommand extends ContainerAwareCommand
         if ($input->getOption('remote') == null) {
             $this->getLocalBackup($dump["timestamp"], $backupFolder, $extractFolder);
         } else {
+            $env = $input->getOption('remote');
             if ($input->getArgument('id') == "c") {
-                $this->getRemoteCurrentBackup($input->getOption('remote'), $extractFolder);
+                $dump = $this->getRemoteCurrentConfig($env);
+                $this->getRemoteCurrentBackup($env, $extractFolder);
             } else {
-                $this->getRemoteBackup($input->getOption('remote'), $id, $extractFolder);
+                $backupConfig = json_decode($this->getRemoteConfig($env), true);
+                $dump = $backupConfig["dumps"][$id];
+                $this->getRemoteBackup($env, $id, $extractFolder);
             }
         }
 

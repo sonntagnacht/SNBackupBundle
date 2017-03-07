@@ -11,12 +11,14 @@
 namespace SN\BackupBundle\Command;
 
 
+use SN\DeployBundle\Services\Version;
 use SN\ToolboxBundle\Helper\CommandHelper;
 use Symfony\Bundle\FrameworkBundle\Command\ContainerAwareCommand;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
+use Symfony\Component\DependencyInjection\Exception\ServiceNotFoundException;
 
 class GetCommand extends ContainerAwareCommand
 {
@@ -37,12 +39,42 @@ class GetCommand extends ContainerAwareCommand
     {
         self::$configs = $this->getContainer()->getParameter('sn_backup');
         $this->output  = $output;
+        $id            = $input->getArgument('id');
 
-        if ($input->getArgument('id') != null) {
+        if ($id != null) {
+
+            if ($id == "c") {
+
+                try {
+                    /**
+                     * @var $sn_deploy Version
+                     */
+                    $sn_deploy  = $this->getContainer()->get('sn_deploy.twig');
+                    $commit     = $sn_deploy->getCommit();
+                    $commitLong = $sn_deploy->getCommit(false);
+                    $version    = $sn_deploy->getVersion();
+                } catch (ServiceNotFoundException $exception) {
+                    $commit     = null;
+                    $commitLong = null;
+                    $version    = null;
+                }
+
+                $dump = [
+                    "timestamp"   => time(),
+                    "commit"      => $commit,
+                    "commit_long" => $commitLong,
+                    "version"     => $version
+                ];
+
+                $output->writeln(json_encode($dump));
+
+                return;
+            }
+
             if ($input->getOption('clean') == null) {
-                $this->getBackup($input->getArgument('id'), $output);
+                $this->getBackup($id, $output);
             } else {
-                $this->cleanUp($input->getArgument('id'));
+                $this->cleanUp($id);
             }
         } else {
             $output->writeln($this->getConfig());
