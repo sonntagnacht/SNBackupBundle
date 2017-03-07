@@ -27,13 +27,22 @@ class DumpCommand extends ContainerAwareCommand
     protected static $buInformations;
     protected static $dump;
     protected static $configs;
+    /**
+     * @var $input InputInterface
+     */
+    protected $input;
+    /**
+     * @var $output OutputInterface
+     */
+    protected $output;
 
     protected function configure()
     {
         $this->setName("sn:backup:dump")
             ->setDescription("Take a snapshot of your current application.")
             ->addOption('remote', 'r', InputOption::VALUE_OPTIONAL, 'Take a snapshot from remote Server.')
-            ->addOption('full', 'f', InputOption::VALUE_NONE, 'Take a backup with webfolder.');
+            ->addOption('full', 'f', InputOption::VALUE_NONE, 'Take a backup with webfolder.')
+            ->addOption('current', 'c', InputOption::VALUE_NONE, 'Without saving');
     }
 
     protected function copyToBackup($archive, $name)
@@ -49,9 +58,9 @@ class DumpCommand extends ContainerAwareCommand
                 $name,
                 file_get_contents($archive)
             );
-            CommandHelper::executeCommand(sprintf("rm -rf %s", $archive));
+            $this->executeCommand(sprintf("rm -rf %s", $archive));
         } catch (\InvalidArgumentException $exception) {
-            CommandHelper::executeCommand(sprintf("mv %s %s", $archive, self::$configs["backup_folder"]));
+            $this->executeCommand(sprintf("mv %s %s", $archive, self::$configs["backup_folder"]));
         }
     }
 
@@ -148,6 +157,9 @@ class DumpCommand extends ContainerAwareCommand
 
     protected function execute(InputInterface $input, OutputInterface $output)
     {
+        $this->input  = $input;
+        $this->output = $output;
+
         if ($input->getOption('remote') != null) {
             $env           = $input->getOption('remote');
             $remoteConfigs = $this->getContainer()->getParameter('sn_deploy.environments');
@@ -190,7 +202,7 @@ class DumpCommand extends ContainerAwareCommand
             $tempFolder
         );
 
-        CommandHelper::executeCommand($cmd, $output, false);
+        $this->executeCommand($cmd, $output, false);
 
         try {
             $gaufrette = $this->getContainer()->get('knp_gaufrette.filesystem_map');
@@ -228,7 +240,7 @@ class DumpCommand extends ContainerAwareCommand
             }
 
         } catch (ServiceNotFoundException $exception) {
-            $output->writeln("No Gaufrette-FilesystemMap found!");
+            $this->writeln("No Gaufrette-FilesystemMap found!");
         }
 
         if ($input->getOption('full')) {
@@ -239,22 +251,46 @@ class DumpCommand extends ContainerAwareCommand
                 $root_dir,
                 $tempFolder);
 
-            CommandHelper::executeCommand($cmd);
+            $this->executeCommand($cmd);
         }
 
-        $timestamp   = time();
+        $timestamp = time();
+        if ($input->getOption('current')) {
+
+            $currentFolder = sprintf("/tmp/%s", md5($timestamp));
+            $cmd           = sprintf("mv %s/* %s", $tempFolder, $currentFolder);
+
+            $this->executeCommand($cmd);
+            $fs->remove($tempFolder);
+
+            $this->writeln($currentFolder, true);
+            return;
+        }
+
         $archiveName = sprintf("%s.tar.gz", date("Y-m-d_H-i-s", $timestamp));
         $tempArchive = sprintf("%s/%s", "/tmp", $archiveName);
-        CommandHelper::executeCommand(
+        $this->executeCommand(
             sprintf("cd %s; tar -czf %s *",
                 $tempFolder,
-                $tempArchive),
-            $output,
-            false);
+                $tempArchive));
         $fs->remove($tempFolder);
 
         $this->copyToBackup($tempArchive, $archiveName);
         $this->addDumpInformations($timestamp);
         $this->saveDumpInformations();
+    }
+
+    protected function executeCommand($cmd, $silence = false)
+    {
+        if ($this->input->getOption('current') || $silence) {
+            return CommandHelper::executeCommand($cmd);
+        }
+
+        return CommandHelper::executeCommand($cmd, $this->output);
+    }
+
+    protected function writeln($message, $force = false) {
+        if(!$this->input->getOption('current') || $force)
+        $this->output->writeln($message);
     }
 }

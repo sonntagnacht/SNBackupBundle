@@ -51,6 +51,42 @@ class RestoreCommand extends ContainerAwareCommand
         }
     }
 
+
+    protected function getRemoteCurrentBackup($env, $extractFolder)
+    {
+        $remoteConfigs = $this->getContainer()->getParameter('sn_deploy.environments');
+        $config        = $remoteConfigs[$env];
+
+        $srcFolder = CommandHelper::executeRemoteCommand(sprintf("php bin/console sn:backup:dump -c"), $config);
+
+        $localArchive = sprintf("%s/%s.tar.gz", self::$configs['backup_folder'], $env);
+
+        if (file_exists($localArchive)) {
+            $cmd = sprintf("rm -Rf %s; mkdir %s; tar xfz %s -C %s",
+                $extractFolder,
+                $extractFolder,
+                $localArchive,
+                $extractFolder);
+
+            CommandHelper::executeCommand($cmd);
+        }
+
+        $cmd = sprintf(
+            "rsync --delete --info=progress2 -r --rsh='ssh -p %s' %s@%s:%s/* %s/",
+            $config["port"],
+            $config["user"],
+            $config["host"],
+            $srcFolder,
+            $extractFolder
+        );
+
+        CommandHelper::executeCommand($cmd, $this->output);
+
+        CommandHelper::executeRemoteCommand(
+            sprintf("php bin/console sn:backup:get -c %s", $srcFolder),
+            $config);
+    }
+
     protected function getRemoteBackup($env, $id, $extractFolder)
     {
         $remoteConfigs = $this->getContainer()->getParameter('sn_deploy.environments');
@@ -136,21 +172,30 @@ class RestoreCommand extends ContainerAwareCommand
             $databasePort = 3306;
         }
 
-        $backupConfig = json_decode($this->getLocalConfig(), true);
+        if ($input->getOption('remote') == null) {
+            $backupConfig = json_decode($this->getLocalConfig(), true);
 
-        if (count($backupConfig["dumps"]) == 0) {
-            $output->writeln(CommandHelper::writeError("Backup not found!"));
+            if (count($backupConfig["dumps"]) == 0) {
+                $output->writeln(CommandHelper::writeError("Backup not found!"));
+
+                return;
+            }
+
+            $dump = $backupConfig["dumps"][$id];
         }
 
-        $dump = $backupConfig["dumps"][$id];
-        $fs   = new Filesystem();
+        $fs = new Filesystem();
         $fs->remove($extractFolder);
         $fs->mkdir($extractFolder);
 
         if ($input->getOption('remote') == null) {
             $this->getLocalBackup($dump["timestamp"], $backupFolder, $extractFolder);
         } else {
-            $this->getRemoteBackup($input->getOption('remote'), $id, $extractFolder);
+            if ($input->getArgument('id') == "c") {
+                $this->getRemoteCurrentBackup($input->getOption('remote'), $extractFolder);
+            } else {
+                $this->getRemoteBackup($input->getOption('remote'), $id, $extractFolder);
+            }
         }
 
         $app_folder  = sprintf("%s/_app", $extractFolder);
