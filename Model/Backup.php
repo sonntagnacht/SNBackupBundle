@@ -1,6 +1,7 @@
 <?php
 namespace SN\BackupBundle\Model;
 
+use SN\ToolboxBundle\Helper\CommandHelper;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Finder\Finder;
 
@@ -50,10 +51,10 @@ class Backup implements \JsonSerializable
     protected function getFilepath()
     {
         if (Config::get(Config::GAUFRETTE)) {
-            return sprintf("gaufrette://%s", Config::BACKUP_FOLDER);
+            return sprintf("gaufrette://%s", Config::get(Config::BACKUP_FOLDER));
         }
 
-        return Config::BACKUP_FOLDER;
+        return Config::get(Config::BACKUP_FOLDER);
     }
 
     /**
@@ -62,6 +63,25 @@ class Backup implements \JsonSerializable
     public function getVersion()
     {
         return $this->version;
+    }
+
+    /**
+     * @param string $dstFolder
+     */
+    public function extractTo($dstFolder)
+    {
+        $tmpFile          = sprintf("/tmp/%s.tar.gz", md5(time()));
+        $absoluteFilename = sprintf("%s/%s", $this->getFilepath(), $this->getFilename());
+
+        $fs = new Filesystem();
+        $fs->copy($absoluteFilename, $tmpFile);
+
+        $cmd = sprintf("tar xfz %s -C %s; rm -rf %s",
+            $tmpFile,
+            $dstFolder,
+            $tmpFile
+        );
+        CommandHelper::executeCommand($cmd);
     }
 
     /**

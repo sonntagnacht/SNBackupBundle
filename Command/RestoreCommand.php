@@ -12,6 +12,7 @@ namespace SN\BackupBundle\Command;
 
 
 use SN\BackupBundle\Model\BackupList;
+use SN\BackupBundle\Model\Config;
 use SN\ToolboxBundle\Helper\CommandHelper;
 use Symfony\Bundle\FrameworkBundle\Command\ContainerAwareCommand;
 use Symfony\Component\Console\Helper\Table;
@@ -233,13 +234,14 @@ class RestoreCommand extends ContainerAwareCommand
     protected function restoreBackup($id, OutputInterface $output, InputInterface $input)
     {
         $extractFolder    = sprintf("%s/../var/sn_backup", $this->getContainer()->get('kernel')->getRootDir());
-        $configs          = self::$configs;
-        $databaseUser     = $configs["database"]["user"];
-        $databaseHost     = $configs["database"]["host"];
-        $databasePort     = $configs["database"]["port"];
-        $databasePassword = $configs["database"]["password"];
-        $databaseName     = $configs["database"]["dbname"];
-        $backupFolder     = $configs["backup_folder"];
+        $database         = Config::get(Config::DATABASE);
+        $databaseUser     = $database["user"];
+        $databaseHost     = $database["host"];
+        $databasePort     = $database["port"];
+        $databasePassword = $database["password"];
+        $databaseName     = $database["dbname"];
+        $backupFolder     = Config::get(Config::BACKUP_FOLDER);
+        $backupList       = BackupList::factory();
 
         if ($databasePort == null) {
             $databasePort = 3306;
@@ -248,13 +250,13 @@ class RestoreCommand extends ContainerAwareCommand
         if ($input->getOption('remote') == null) {
             $backupConfig = json_decode($this->getLocalConfig(), true);
 
-            if (count($backupConfig["dumps"]) == 0) {
+            if (!$backupList->hasBackups()) {
                 $output->writeln(CommandHelper::writeError("Backup not found!"));
 
                 return;
             }
 
-            $dump = $backupConfig["dumps"][$id];
+            $backup = $backupList->getDumps()[$id];
         }
 
         $fs = new Filesystem();
@@ -262,7 +264,7 @@ class RestoreCommand extends ContainerAwareCommand
         $fs->mkdir($extractFolder);
 
         if ($input->getOption('remote') == null) {
-            $this->getLocalBackup($dump["timestamp"], $backupFolder, $extractFolder);
+            $backup->extractTo($extractFolder);
         } else {
             $env = $input->getOption('remote');
             if ($input->getArgument('id') == "c") {
@@ -275,15 +277,15 @@ class RestoreCommand extends ContainerAwareCommand
             }
         }
 
-        $app_folder  = sprintf("%s/_app", $extractFolder);
-        $root_folder = $this->getContainer()->get('kernel')->getRootDir() . "/../";
+        $app_folder = sprintf("%s/_app", $extractFolder);
 
         if ($fs->exists($app_folder)) {
-            $helper   = $this->getHelper('question');
-            $cmd      = sprintf("cp -r %s %s",
+            $root_folder = $this->getContainer()->get('kernel')->getRootDir() . "/../";
+            $helper      = $this->getHelper('question');
+            $cmd         = sprintf("cp -r %s %s",
                 $app_folder,
                 $root_folder);
-            $question = new ConfirmationQuestion(
+            $question    = new ConfirmationQuestion(
                 sprintf(
                     'Do you want restore your webfolder [y/N]? ',
                     $cmd)
@@ -309,9 +311,9 @@ class RestoreCommand extends ContainerAwareCommand
         $cmd = "git rev-parse --is-inside-work-tree";
 
         // git reset
-        if ($dump["commit_long"] != null && CommandHelper::executeCommand($cmd)) {
+        if ($backup->getCommit() != null && CommandHelper::executeCommand($cmd)) {
             $helper   = $this->getHelper('question');
-            $cmd      = sprintf("git reset --hard %s", $dump["commit_long"]);
+            $cmd      = sprintf("git reset --hard %s", $backup->getCommit());
             $question = new ConfirmationQuestion(
                 sprintf(
                     'Do you want to execute \'%s\' [y/N]? ',
@@ -366,7 +368,7 @@ class RestoreCommand extends ContainerAwareCommand
      */
     protected function getLocalConfig()
     {
-        return (string)BackupList::factory();
+        return BackupList::factory();
     }
 
     protected function getRemoteConfig($env)
@@ -377,15 +379,18 @@ class RestoreCommand extends ContainerAwareCommand
         return CommandHelper::executeRemoteCommand("php bin/console sn:backup:get", $config);
     }
 
-    protected function renderList(OutputInterface $output, $configs)
+    protected function renderList(OutputInterface $output, BackupList $config)
     {
-        $configs = json_decode($configs, true);
-
         $backup = new Table($output);
         $backup->setHeaders(array("ID", "Timestamp", "Version", "Commit"));
-        if (count($configs["dumps"]) > 0) {
-            foreach ($configs["dumps"] as $id => $dump) {
-                $backup->addRow(array($id, date("Y-m-d H-i-s", $dump["timestamp"]), $dump["version"], $dump["commit"]));
+        if ($config->hasBackups()) {
+            foreach ($config->getDumps() as $id => $dump) {
+                $backup->addRow(array(
+                    $id,
+                    date("Y-m-d H-i-s", $dump->getTimestamp()),
+                    $dump->getVersion(),
+                    $dump->getCommit()
+                ));
             }
         }
         $backup->render();

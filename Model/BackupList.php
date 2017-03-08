@@ -43,6 +43,7 @@ class BackupList implements \JsonSerializable
             $backup->setTimestamp($v["timestamp"]);
             $backup->setVersion($v["version"]);
             $backup->setCommit($v["commit"]);
+            $json_data["dumps"][$k] = $backup;
         }
         $this->list = $json_data;
     }
@@ -95,6 +96,18 @@ class BackupList implements \JsonSerializable
     public function addBackup(Backup $backup)
     {
         array_unshift($this->list, $backup);
+    }
+
+    public function hasBackups()
+    {
+        return (count($this->list) > 0);
+    }
+
+    /**
+     * @return array|Backup[]
+     */
+    public function getDumps(){
+        return $this->list["dumps"];
     }
 
     public function jsonSerialize()
