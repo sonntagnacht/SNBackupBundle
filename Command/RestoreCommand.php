@@ -11,7 +11,7 @@
 namespace SN\BackupBundle\Command;
 
 
-use Gaufrette\Exception\FileNotFound;
+use SN\BackupBundle\Model\BackupList;
 use SN\ToolboxBundle\Helper\CommandHelper;
 use Symfony\Bundle\FrameworkBundle\Command\ContainerAwareCommand;
 use Symfony\Component\Console\Helper\Table;
@@ -49,8 +49,12 @@ class RestoreCommand extends ContainerAwareCommand
         if ($input->getArgument('id') != null) {
             $this->restoreBackup($input->getArgument('id'), $output, $input);
         } else {
-            $this->renderList($output,
-                ($input->getOption('remote') == null) ? $this->getLocalConfig() : $this->getRemoteConfig($input->getOption('remote')));
+            $this->renderList(
+                $output,
+                ($input->getOption('remote') == null) ?
+                    $this->getLocalConfig() :
+                    $this->getRemoteConfig($input->getOption('remote'))
+            );
         }
     }
 
@@ -66,10 +70,10 @@ class RestoreCommand extends ContainerAwareCommand
         $archiveName = sprintf("%s.tar.gz", $env);
         $tempArchive = sprintf("%s/%s", "/tmp", $archiveName);
 
-        try{
+        try {
             $this->output->writeln('unpack last remote archive');
             $this->copyFromBackup($archiveName, $extractFolder);
-        }catch (\Exception $e) {
+        } catch (\Exception $e) {
 
         }
 
@@ -115,7 +119,8 @@ class RestoreCommand extends ContainerAwareCommand
         }
     }
 
-    protected function copyFromBackup($archiveName, $extractFolder){
+    protected function copyFromBackup($archiveName, $extractFolder)
+    {
         $backupArchive = sprintf("%s/%s", self::$configs["backup_folder"], $archiveName);
         $tempArchive   = sprintf("%s/%s", "/tmp", $archiveName);
 
@@ -361,26 +366,7 @@ class RestoreCommand extends ContainerAwareCommand
      */
     protected function getLocalConfig()
     {
-        try {
-            /**
-             * @var $fs \Gaufrette\Filesystem
-             */
-            $fs = $this->getContainer()
-                ->get('knp_gaufrette.filesystem_map')
-                ->get(self::$configs["backup_folder"]);
-            try {
-                return $fs->read('backup.json');
-            } catch (FileNotFound $exception) {
-                return "{dumps:[]}";
-            }
-        } catch (\InvalidArgumentException $exception) {
-            $backupFile = sprintf("%s/backup.json", self::$configs["backup_folder"]);
-            if (file_exists($backupFile)) {
-                return file_get_contents($backupFile);
-            } else {
-                return "{dumps:[]}";
-            }
-        }
+        return (string)BackupList::factory();
     }
 
     protected function getRemoteConfig($env)
