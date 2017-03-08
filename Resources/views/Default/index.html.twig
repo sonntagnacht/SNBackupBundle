@@ -38,7 +38,8 @@
           <div class="btn-group">
             <a class="btn btn-default" href="{{ path('backup_information', {id: loop.index0 }) }}" title="Informations"><i
                 class="glyphicon glyphicon-eye-open"></i></a>
-            <a class="btn btn-default disabled" title="Restore"><i class="glyphicon glyphicon-import"></i></a>
+            <a class="btn btn-default" href="{{ path('backup_download', {id: loop.index0 }) }}" title="Download"><i
+                class="glyphicon glyphicon-save"></i></a>
           </div>
         </td>
       </tr>

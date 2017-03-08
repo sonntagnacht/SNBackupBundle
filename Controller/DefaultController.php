@@ -6,7 +6,9 @@ use Gaufrette\Exception\FileNotFound;
 use SN\ToolboxBundle\Helper\CommandHelper;
 use Symfony\Bundle\FrameworkBundle\Controller\Controller;
 use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\ResponseHeaderBag;
 use Symfony\Component\Routing\Annotation\Route;
 
 class DefaultController extends Controller
@@ -24,6 +26,27 @@ class DefaultController extends Controller
             array(
                 "backups" => $backups
             ));
+    }
+
+    /**
+     * @Route("/{id}/download", name="backup_download")
+     * @param Request $request
+     * @return BinaryFileResponse
+     */
+    public function downloadAction(Request $request)
+    {
+        $config      = $this->getParameter('sn_backup');
+        $backups     = json_decode($this->getLocalConfig($config["backup_folder"]), true)["dumps"];
+        $backup      = $backups[$request->get('id')];
+        $archiveName = sprintf("%s.tar.gz", date("Y-m-d_H-i-s", $backup["timestamp"]));
+
+        $response = new BinaryFileResponse($this->getFile($config["backup_folder"], $archiveName));
+        $response->setContentDisposition(
+            ResponseHeaderBag::DISPOSITION_INLINE,
+            $archiveName
+        );
+
+        return $response;
     }
 
     /**
@@ -83,6 +106,24 @@ class DefaultController extends Controller
             $fs->dumpFile($target, $data);
         } catch (\InvalidArgumentException $exception) {
             CommandHelper::executeCommand(sprintf("cp %s %s", $backupArchive, $target));
+        }
+    }
+
+    protected function getFile($backupFolder, $source)
+    {
+        $backupArchive = sprintf("%s/%s", $backupFolder, $source);
+
+        try {
+            /**
+             * @var $gfs \Gaufrette\Filesystem
+             */
+            $gfs  = $this
+                ->get('knp_gaufrette.filesystem_map')
+                ->get($backupFolder);
+            return $gfs->get($backupArchive);
+
+        } catch (\InvalidArgumentException $exception) {
+            return $backupArchive;
         }
     }
 
