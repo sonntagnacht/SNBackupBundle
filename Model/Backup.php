@@ -35,14 +35,17 @@ class Backup implements \JsonSerializable
         return $files[0];
     }
 
+    protected function getAbsolutepath(){
+        return sprintf("%s/%s", $this->getFilepath(), $this->getFilename());
+    }
+
     /**
      * @param \SplFileInfo $file
      */
-    protected function setFile(\SplFileInfo $file)
+    public function setFile(\SplFileInfo $file)
     {
         $fs               = new Filesystem();
-        $absoluteFilename = sprintf("%s/%s", $this->getFilepath(), $this->getFilename());
-        $fs->dumpFile($absoluteFilename, file_get_contents($file->getRealPath()));
+        $fs->dumpFile($this->getAbsolutepath(), file_get_contents($file->getRealPath()));
     }
 
     /**

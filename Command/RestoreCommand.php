@@ -190,37 +190,6 @@ class RestoreCommand extends ContainerAwareCommand
             $config));
     }
 
-    protected function getLocalBackup($timestamp, $backupFolder, $extractFolder)
-    {
-        $archiveName   = sprintf("%s.tar.gz", date("Y-m-d_H-i-s", $timestamp));
-        $backupArchive = sprintf("%s/%s", $backupFolder, $archiveName);
-        $tempArchive   = sprintf("%s/%s", "/tmp", $archiveName);
-
-        try {
-            /**
-             * @var $gfs \Gaufrette\Filesystem
-             */
-            $gfs  = $this->getContainer()
-                ->get('knp_gaufrette.filesystem_map')
-                ->get(self::$configs["backup_folder"]);
-            $data = $gfs->read($archiveName);
-
-            /**
-             * @var $fs Filesystem
-             */
-            $fs = new Filesystem();
-            $fs->dumpFile($tempArchive, $data);
-        } catch (\InvalidArgumentException $exception) {
-            CommandHelper::executeCommand(sprintf("cp %s %s", $backupArchive, $tempArchive));
-        }
-
-        $cmd = sprintf("tar xfz %s -C %s",
-            $tempArchive,
-            $extractFolder
-        );
-        CommandHelper::executeCommand($cmd);
-    }
-
     protected function getRemoteCurrentConfig($env)
     {
         $remoteConfigs = $this->getContainer()->getParameter('sn_deploy.environments');
