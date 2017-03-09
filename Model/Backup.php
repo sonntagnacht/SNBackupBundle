@@ -3,7 +3,6 @@ namespace SN\BackupBundle\Model;
 
 use SN\ToolboxBundle\Helper\CommandHelper;
 use Symfony\Component\Filesystem\Filesystem;
-use Symfony\Component\Finder\Finder;
 
 /**
  * SNBundle
@@ -15,27 +14,57 @@ use Symfony\Component\Finder\Finder;
  */
 class Backup implements \JsonSerializable
 {
+    protected $filename = null;
     protected $version;
     protected $timestamp;
     protected $commit;
 
     public function getFilename()
     {
-        return sprintf("%s.tar.gz", date("Y-m-d_H-i-s", $this->timestamp));
+        if ($this->filename == null) {
+            return sprintf("%s.tar.gz", date("Y-m-d_H-i-s", $this->getTimestamp()));
+        }
+
+        return sprintf("%s.tar.gz", $this->filename);
+    }
+
+    public function archive_exists()
+    {
+        $fs = new Filesystem();
+
+        return $fs->exists($this->getAbsolutepath());
     }
 
     /**
-     * @return \SplFileInfo
+     * @param $fielname
+     * @return $this
+     */
+    public function setFilename($fielname)
+    {
+        $this->filename = $fielname;
+
+        return $this;
+    }
+
+    /**
+     * @return \SplFileInfo|boolean
      */
     protected function getFile()
     {
-        $finder = new Finder();
-        $files  = $finder->name($this->getFilename())->in($this->getFilepath());
+        $file = new \SplFileInfo($this->getAbsolutepath());
 
-        return $files[0];
+        if ($file->isFile() === false) {
+            return false;
+        }
+
+        return $file;
     }
 
-    protected function getAbsolutepath(){
+    /**
+     * @return string
+     */
+    protected function getAbsolutepath()
+    {
         return sprintf("%s/%s", $this->getFilepath(), $this->getFilename());
     }
 
@@ -44,7 +73,7 @@ class Backup implements \JsonSerializable
      */
     public function setFile(\SplFileInfo $file)
     {
-        $fs               = new Filesystem();
+        $fs = new Filesystem();
         $fs->dumpFile($this->getAbsolutepath(), file_get_contents($file->getRealPath()));
     }
 
@@ -73,11 +102,10 @@ class Backup implements \JsonSerializable
      */
     public function extractTo($dstFolder)
     {
-        $tmpFile          = sprintf("/tmp/%s.tar.gz", md5(time()));
-        $absoluteFilename = sprintf("%s/%s", $this->getFilepath(), $this->getFilename());
+        $tmpFile = sprintf("/tmp/%s.tar.gz", md5(time()));
 
         $fs = new Filesystem();
-        $fs->copy($absoluteFilename, $tmpFile);
+        $fs->copy($this->getAbsolutepath(), $tmpFile);
 
         $cmd = sprintf("tar xfz %s -C %s; rm -rf %s",
             $tmpFile,
@@ -85,6 +113,17 @@ class Backup implements \JsonSerializable
             $tmpFile
         );
         CommandHelper::executeCommand($cmd);
+    }
+
+    public function insertFrom($srcFolder)
+    {
+        $tmpFile = sprintf("/tmp/%s.tar.gz", md5(time()));
+
+        $cmd = sprintf("cd %s; tar -czf %s *", $srcFolder, $tmpFile);
+        CommandHelper::executeCommand($cmd);
+
+        $fs = new Filesystem();
+        $fs->copy($tmpFile, $this->getAbsolutepath(), true);
     }
 
     /**

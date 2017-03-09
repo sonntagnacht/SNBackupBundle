@@ -13,6 +13,8 @@ namespace SN\BackupBundle\Command;
 
 use SN\BackupBundle\Model\BackupList;
 use SN\BackupBundle\Model\Config;
+use SN\BackupBundle\Model\RemoteBackup;
+use SN\BackupBundle\Model\RemoteBackupList;
 use SN\ToolboxBundle\Helper\CommandHelper;
 use Symfony\Bundle\FrameworkBundle\Command\ContainerAwareCommand;
 use Symfony\Component\Console\Helper\Table;
@@ -53,8 +55,9 @@ class RestoreCommand extends ContainerAwareCommand
             $this->renderList(
                 $output,
                 ($input->getOption('remote') == null) ?
-                    $this->getLocalConfig() :
-                    $this->getRemoteConfig($input->getOption('remote'))
+                    BackupList::factory() :
+                    new RemoteBackupList($input->getOption('remote'), $this->getContainer()
+                        ->getParameter('sn_deploy.environments'))
             );
         }
     }
@@ -65,39 +68,7 @@ class RestoreCommand extends ContainerAwareCommand
         $remoteConfigs = $this->getContainer()->getParameter('sn_deploy.environments');
         $config        = $remoteConfigs[$env];
 
-        $this->output->writeln('Collect files of server');
-        $srcFolder = CommandHelper::executeRemoteCommand(sprintf("php bin/console sn:backup:dump -c"), $config);
-
-        $archiveName = sprintf("%s.tar.gz", $env);
-        $tempArchive = sprintf("%s/%s", "/tmp", $archiveName);
-
-        try {
-            $this->output->writeln('unpack last remote archive');
-            $this->copyFromBackup($archiveName, $extractFolder);
-        } catch (\Exception $e) {
-
-        }
-
-        $cmd = sprintf(
-            "rsync --delete --info=progress2 -r --rsh='ssh -p %s' %s@%s:%s/* %s/",
-            $config["port"],
-            $config["user"],
-            $config["host"],
-            $srcFolder,
-            $extractFolder
-        );
-
-        CommandHelper::executeCommand($cmd, $this->output);
-        CommandHelper::executeCommand(
-            sprintf("cd %s; tar -czf %s *",
-                $extractFolder,
-                $tempArchive));
-
-        $this->copyToBackup($tempArchive, $archiveName);
-
-        CommandHelper::executeRemoteCommand(
-            sprintf("php bin/console sn:backup:get -c %s", $srcFolder),
-            $config);
+        new RemoteBackup($env, $remoteConfigs[$env], "c");
     }
 
     protected function copyToBackup($archive, $name)
@@ -237,8 +208,8 @@ class RestoreCommand extends ContainerAwareCommand
         } else {
             $env = $input->getOption('remote');
             if ($input->getArgument('id') == "c") {
-                $dump = $this->getRemoteCurrentConfig($env);
-                $this->getRemoteCurrentBackup($env, $extractFolder);
+                $backup = new RemoteBackup($env, $this->getContainer()->getParameter('sn_deploy.environments'), 'c');
+                $backup->extractTo($extractFolder, $output);
             } else {
                 $backupConfig = json_decode($this->getRemoteConfig($env), true);
                 $dump         = $backupConfig["dumps"][$id];
@@ -348,7 +319,11 @@ class RestoreCommand extends ContainerAwareCommand
         return CommandHelper::executeRemoteCommand("php bin/console sn:backup:get", $config);
     }
 
-    protected function renderList(OutputInterface $output, BackupList $config)
+    /**
+     * @param OutputInterface $output
+     * @param BackupList|RemoteBackupList $config
+     */
+    protected function renderList(OutputInterface $output, $config)
     {
         $backup = new Table($output);
         $backup->setHeaders(array("ID", "Timestamp", "Version", "Commit"));

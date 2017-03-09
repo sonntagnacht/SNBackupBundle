@@ -244,7 +244,6 @@ class DumpCommand extends ContainerAwareCommand
             }
 
         } catch (ServiceNotFoundException $exception) {
-            $this->writeln("No Gaufrette-FilesystemMap found!");
         }
 
         if ($input->getOption('full')) {
@@ -272,22 +271,10 @@ class DumpCommand extends ContainerAwareCommand
             return;
         }
 
-        $archiveName = sprintf("%s.tar.gz", date("Y-m-d_H-i-s", $timestamp));
-        $tempArchive = sprintf("%s/%s", "/tmp", $archiveName);
-        $this->executeCommand(
-            sprintf("cd %s; tar -czf %s *",
-                $tempFolder,
-                $tempArchive));
-        $fs->remove($tempFolder);
-
-        $finder = new Finder();
-        $files  = $finder->name($archiveName)->in('/tmp');
-        $file   = \iterator_to_array($files);
-
         $backup = new Backup();
         $backup->setTimestamp($timestamp);
-        $backup->setFile(array_shift($file));
-        $fs->remove($tempArchive);
+        $backup->insertFrom($tempFolder);
+        $fs->remove($tempFolder);
 
         try {
             /**

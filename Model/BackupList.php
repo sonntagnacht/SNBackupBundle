@@ -12,14 +12,13 @@ namespace SN\BackupBundle\Model;
 
 
 use Symfony\Component\Filesystem\Filesystem;
-use Symfony\Component\Finder\Finder;
 
 class BackupList implements \JsonSerializable
 {
     /**
      * @var BackupList
      */
-    protected static $instance = null;
+    private static $instance = null;
 
     /**
      * @var array
@@ -32,7 +31,7 @@ class BackupList implements \JsonSerializable
             return self::$instance;
         }
 
-        if (file_exists($this->getFile()->getRealPath()) === false) {
+        if ($this->getFile() == null) {
             return $this;
         }
 
@@ -63,15 +62,25 @@ class BackupList implements \JsonSerializable
     }
 
     /**
-     * @return \SplFileInfo
+     * @return \SplFileInfo|boolean
      */
     protected function getFile()
     {
-        $finder = new Finder();
-        $files  = $finder->name($this->getFilename())->in($this->getFilepath());
-        $file   = \iterator_to_array($files);
+        $file = new \SplFileInfo($this->getAbsolutepath());
 
-        return array_shift($file);
+        if ($file->isFile() === false) {
+            return false;
+        }
+
+        return $file;
+    }
+
+    /**
+     * @return string
+     */
+    protected function getAbsolutepath()
+    {
+        return sprintf("%s/%s", $this->getFilepath(), $this->getFilename());
     }
 
     /**
@@ -95,7 +104,8 @@ class BackupList implements \JsonSerializable
 
     public function addBackup(Backup $backup)
     {
-        array_unshift($this->list, $backup);
+        array_unshift($this->list["dumps"], $backup);
+        $this->save();
     }
 
     public function hasBackups()
@@ -106,7 +116,8 @@ class BackupList implements \JsonSerializable
     /**
      * @return array|Backup[]
      */
-    public function getDumps(){
+    public function getDumps()
+    {
         return $this->list["dumps"];
     }
 
