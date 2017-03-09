@@ -12,6 +12,9 @@ namespace SN\BackupBundle\Command;
 
 
 use Gaufrette\Exception\FileNotFound;
+use SN\BackupBundle\Model\Backup;
+use SN\BackupBundle\Model\BackupList;
+use SN\BackupBundle\Model\Config;
 use SN\DeployBundle\Services\Version;
 use SN\ToolboxBundle\Helper\CommandHelper;
 use Symfony\Bundle\FrameworkBundle\Command\ContainerAwareCommand;
@@ -20,6 +23,7 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\DependencyInjection\Exception\ServiceNotFoundException;
 use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\Finder\Finder;
 
 class DumpCommand extends ContainerAwareCommand
 {
@@ -47,6 +51,7 @@ class DumpCommand extends ContainerAwareCommand
 
     protected function copyToBackup($archive, $name)
     {
+
         try {
             /**
              * @var $fs \Gaufrette\Filesystem
@@ -169,21 +174,21 @@ class DumpCommand extends ContainerAwareCommand
             return;
         }
 
-        $fs            = new Filesystem();
-        self::$configs = $this->getContainer()->getParameter('sn_backup');
-        $tempFolder    = sprintf("%s/../var/sn_backup", $this->getContainer()->get('kernel')->getRootDir());
+        $fs         = new Filesystem();
+        $tempFolder = sprintf("/tmp/sn_backup");
+        $database   = Config::get(Config::DATABASE);
 
         // prepare backup folder
         $fs->remove($tempFolder);
         $fs->mkdir($tempFolder);
 
         // Get configs
-        $databaseUser      = self::$configs["database"]["user"];
-        $databaseHost      = self::$configs["database"]["host"];
-        $databasePort      = self::$configs["database"]["port"];
-        $databasePassword  = self::$configs["database"]["password"];
-        $databaseName      = self::$configs["database"]["dbname"];
-        $backupFolder      = self::$configs["backup_folder"];
+        $databaseUser     = $database["user"];
+        $databaseHost     = $database["host"];
+        $databasePort     = $database["port"];
+        $databasePassword = $database["password"];
+        $databaseName     = $database["dbname"];
+        $backupFolder     = Config::get(Config::BACKUP_FOLDER);
 
         $this->loadDumpInformations();
 
@@ -201,7 +206,7 @@ class DumpCommand extends ContainerAwareCommand
             $tempFolder
         );
 
-        $this->executeCommand($cmd, $output, false);
+        $this->executeCommand($cmd);
 
         try {
             $gaufrette = $this->getContainer()->get('knp_gaufrette.filesystem_map');
@@ -239,7 +244,6 @@ class DumpCommand extends ContainerAwareCommand
             }
 
         } catch (ServiceNotFoundException $exception) {
-            $this->writeln("No Gaufrette-FilesystemMap found!");
         }
 
         if ($input->getOption('full')) {
@@ -263,20 +267,28 @@ class DumpCommand extends ContainerAwareCommand
             $fs->remove($tempFolder);
 
             $this->writeln($currentFolder, true);
+
             return;
         }
 
-        $archiveName = sprintf("%s.tar.gz", date("Y-m-d_H-i-s", $timestamp));
-        $tempArchive = sprintf("%s/%s", "/tmp", $archiveName);
-        $this->executeCommand(
-            sprintf("cd %s; tar -czf %s *",
-                $tempFolder,
-                $tempArchive));
+        $backup = new Backup();
+        $backup->setTimestamp($timestamp);
+        $backup->insertFrom($tempFolder);
         $fs->remove($tempFolder);
 
-        $this->copyToBackup($tempArchive, $archiveName);
-        $this->addDumpInformations($timestamp);
-        $this->saveDumpInformations();
+        try {
+            /**
+             * @var $sn_deploy Version
+             */
+            $sn_deploy = $this->getContainer()->get('sn_deploy.twig');
+            $backup->setCommit($sn_deploy->getCommit(false));
+            $backup->setVersion($sn_deploy->getVersion());
+        } catch (ServiceNotFoundException $exception) {
+            $backup->setCommit(null);
+            $backup->setVersion(null);
+        }
+
+        BackupList::factory()->addBackup($backup);
     }
 
     protected function executeCommand($cmd, $silence = false)
@@ -288,8 +300,10 @@ class DumpCommand extends ContainerAwareCommand
         return CommandHelper::executeCommand($cmd, $this->output);
     }
 
-    protected function writeln($message, $force = false) {
-        if(!$this->input->getOption('current') || $force)
-        $this->output->writeln($message);
+    protected function writeln($message, $force = false)
+    {
+        if (!$this->input->getOption('current') || $force) {
+            $this->output->writeln($message);
+        }
     }
 }

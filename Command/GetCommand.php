@@ -11,6 +11,7 @@
 namespace SN\BackupBundle\Command;
 
 
+use SN\BackupBundle\Model\BackupList;
 use SN\DeployBundle\Services\Version;
 use SN\ToolboxBundle\Helper\CommandHelper;
 use Symfony\Bundle\FrameworkBundle\Command\ContainerAwareCommand;
@@ -141,25 +142,6 @@ class GetCommand extends ContainerAwareCommand
 
     protected function getConfig()
     {
-        try {
-            /**
-             * @var $fs \Gaufrette\Filesystem
-             */
-            $fs = $this->getContainer()
-                ->get('knp_gaufrette.filesystem_map')
-                ->get(self::$configs["backup_folder"]);
-            try {
-                return $fs->read('backup.json');
-            } catch (FileNotFound $exception) {
-                return "{dumps:[]}";
-            }
-        } catch (\InvalidArgumentException $exception) {
-            $backupFile = sprintf("%s/backup.json", self::$configs["backup_folder"]);
-            if (file_exists($backupFile)) {
-                return file_get_contents($backupFile);
-            } else {
-                return "{dumps:[]}";
-            }
-        }
+        return (string)BackupList::factory();
     }
 }

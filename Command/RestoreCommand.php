@@ -11,7 +11,10 @@
 namespace SN\BackupBundle\Command;
 
 
-use Gaufrette\Exception\FileNotFound;
+use SN\BackupBundle\Model\BackupList;
+use SN\BackupBundle\Model\Config;
+use SN\BackupBundle\Model\RemoteBackup;
+use SN\BackupBundle\Model\RemoteBackupList;
 use SN\ToolboxBundle\Helper\CommandHelper;
 use Symfony\Bundle\FrameworkBundle\Command\ContainerAwareCommand;
 use Symfony\Component\Console\Helper\Table;
@@ -49,8 +52,13 @@ class RestoreCommand extends ContainerAwareCommand
         if ($input->getArgument('id') != null) {
             $this->restoreBackup($input->getArgument('id'), $output, $input);
         } else {
-            $this->renderList($output,
-                ($input->getOption('remote') == null) ? $this->getLocalConfig() : $this->getRemoteConfig($input->getOption('remote')));
+            $this->renderList(
+                $output,
+                ($input->getOption('remote') == null) ?
+                    BackupList::factory() :
+                    new RemoteBackupList($input->getOption('remote'), $this->getContainer()
+                        ->getParameter('sn_deploy.environments'))
+            );
         }
     }
 
@@ -60,39 +68,7 @@ class RestoreCommand extends ContainerAwareCommand
         $remoteConfigs = $this->getContainer()->getParameter('sn_deploy.environments');
         $config        = $remoteConfigs[$env];
 
-        $this->output->writeln('Collect files of server');
-        $srcFolder = CommandHelper::executeRemoteCommand(sprintf("php bin/console sn:backup:dump -c"), $config);
-
-        $archiveName = sprintf("%s.tar.gz", $env);
-        $tempArchive = sprintf("%s/%s", "/tmp", $archiveName);
-
-        try{
-            $this->output->writeln('unpack last remote archive');
-            $this->copyFromBackup($archiveName, $extractFolder);
-        }catch (\Exception $e) {
-
-        }
-
-        $cmd = sprintf(
-            "rsync --delete --info=progress2 -r --rsh='ssh -p %s' %s@%s:%s/* %s/",
-            $config["port"],
-            $config["user"],
-            $config["host"],
-            $srcFolder,
-            $extractFolder
-        );
-
-        CommandHelper::executeCommand($cmd, $this->output);
-        CommandHelper::executeCommand(
-            sprintf("cd %s; tar -czf %s *",
-                $extractFolder,
-                $tempArchive));
-
-        $this->copyToBackup($tempArchive, $archiveName);
-
-        CommandHelper::executeRemoteCommand(
-            sprintf("php bin/console sn:backup:get -c %s", $srcFolder),
-            $config);
+        new RemoteBackup($env, $remoteConfigs[$env], "c");
     }
 
     protected function copyToBackup($archive, $name)
@@ -115,7 +91,8 @@ class RestoreCommand extends ContainerAwareCommand
         }
     }
 
-    protected function copyFromBackup($archiveName, $extractFolder){
+    protected function copyFromBackup($archiveName, $extractFolder)
+    {
         $backupArchive = sprintf("%s/%s", self::$configs["backup_folder"], $archiveName);
         $tempArchive   = sprintf("%s/%s", "/tmp", $archiveName);
 
@@ -184,37 +161,6 @@ class RestoreCommand extends ContainerAwareCommand
             $config));
     }
 
-    protected function getLocalBackup($timestamp, $backupFolder, $extractFolder)
-    {
-        $archiveName   = sprintf("%s.tar.gz", date("Y-m-d_H-i-s", $timestamp));
-        $backupArchive = sprintf("%s/%s", $backupFolder, $archiveName);
-        $tempArchive   = sprintf("%s/%s", "/tmp", $archiveName);
-
-        try {
-            /**
-             * @var $gfs \Gaufrette\Filesystem
-             */
-            $gfs  = $this->getContainer()
-                ->get('knp_gaufrette.filesystem_map')
-                ->get(self::$configs["backup_folder"]);
-            $data = $gfs->read($archiveName);
-
-            /**
-             * @var $fs Filesystem
-             */
-            $fs = new Filesystem();
-            $fs->dumpFile($tempArchive, $data);
-        } catch (\InvalidArgumentException $exception) {
-            CommandHelper::executeCommand(sprintf("cp %s %s", $backupArchive, $tempArchive));
-        }
-
-        $cmd = sprintf("tar xfz %s -C %s",
-            $tempArchive,
-            $extractFolder
-        );
-        CommandHelper::executeCommand($cmd);
-    }
-
     protected function getRemoteCurrentConfig($env)
     {
         $remoteConfigs = $this->getContainer()->getParameter('sn_deploy.environments');
@@ -228,13 +174,14 @@ class RestoreCommand extends ContainerAwareCommand
     protected function restoreBackup($id, OutputInterface $output, InputInterface $input)
     {
         $extractFolder    = sprintf("%s/../var/sn_backup", $this->getContainer()->get('kernel')->getRootDir());
-        $configs          = self::$configs;
-        $databaseUser     = $configs["database"]["user"];
-        $databaseHost     = $configs["database"]["host"];
-        $databasePort     = $configs["database"]["port"];
-        $databasePassword = $configs["database"]["password"];
-        $databaseName     = $configs["database"]["dbname"];
-        $backupFolder     = $configs["backup_folder"];
+        $database         = Config::get(Config::DATABASE);
+        $databaseUser     = $database["user"];
+        $databaseHost     = $database["host"];
+        $databasePort     = $database["port"];
+        $databasePassword = $database["password"];
+        $databaseName     = $database["dbname"];
+        $backupFolder     = Config::get(Config::BACKUP_FOLDER);
+        $backupList       = BackupList::factory();
 
         if ($databasePort == null) {
             $databasePort = 3306;
@@ -243,13 +190,13 @@ class RestoreCommand extends ContainerAwareCommand
         if ($input->getOption('remote') == null) {
             $backupConfig = json_decode($this->getLocalConfig(), true);
 
-            if (count($backupConfig["dumps"]) == 0) {
+            if (!$backupList->hasBackups()) {
                 $output->writeln(CommandHelper::writeError("Backup not found!"));
 
                 return;
             }
 
-            $dump = $backupConfig["dumps"][$id];
+            $backup = $backupList->getDumps()[$id];
         }
 
         $fs = new Filesystem();
@@ -257,12 +204,12 @@ class RestoreCommand extends ContainerAwareCommand
         $fs->mkdir($extractFolder);
 
         if ($input->getOption('remote') == null) {
-            $this->getLocalBackup($dump["timestamp"], $backupFolder, $extractFolder);
+            $backup->extractTo($extractFolder);
         } else {
             $env = $input->getOption('remote');
             if ($input->getArgument('id') == "c") {
-                $dump = $this->getRemoteCurrentConfig($env);
-                $this->getRemoteCurrentBackup($env, $extractFolder);
+                $backup = new RemoteBackup($env, $this->getContainer()->getParameter('sn_deploy.environments'), 'c');
+                $backup->extractTo($extractFolder, $output);
             } else {
                 $backupConfig = json_decode($this->getRemoteConfig($env), true);
                 $dump         = $backupConfig["dumps"][$id];
@@ -270,15 +217,15 @@ class RestoreCommand extends ContainerAwareCommand
             }
         }
 
-        $app_folder  = sprintf("%s/_app", $extractFolder);
-        $root_folder = $this->getContainer()->get('kernel')->getRootDir() . "/../";
+        $app_folder = sprintf("%s/_app", $extractFolder);
 
         if ($fs->exists($app_folder)) {
-            $helper   = $this->getHelper('question');
-            $cmd      = sprintf("cp -r %s %s",
+            $root_folder = $this->getContainer()->get('kernel')->getRootDir() . "/../";
+            $helper      = $this->getHelper('question');
+            $cmd         = sprintf("cp -r %s %s",
                 $app_folder,
                 $root_folder);
-            $question = new ConfirmationQuestion(
+            $question    = new ConfirmationQuestion(
                 sprintf(
                     'Do you want restore your webfolder [y/N]? ',
                     $cmd)
@@ -304,9 +251,9 @@ class RestoreCommand extends ContainerAwareCommand
         $cmd = "git rev-parse --is-inside-work-tree";
 
         // git reset
-        if ($dump["commit_long"] != null && CommandHelper::executeCommand($cmd)) {
+        if ($backup->getCommit() != null && CommandHelper::executeCommand($cmd)) {
             $helper   = $this->getHelper('question');
-            $cmd      = sprintf("git reset --hard %s", $dump["commit_long"]);
+            $cmd      = sprintf("git reset --hard %s", $backup->getCommit());
             $question = new ConfirmationQuestion(
                 sprintf(
                     'Do you want to execute \'%s\' [y/N]? ',
@@ -361,26 +308,7 @@ class RestoreCommand extends ContainerAwareCommand
      */
     protected function getLocalConfig()
     {
-        try {
-            /**
-             * @var $fs \Gaufrette\Filesystem
-             */
-            $fs = $this->getContainer()
-                ->get('knp_gaufrette.filesystem_map')
-                ->get(self::$configs["backup_folder"]);
-            try {
-                return $fs->read('backup.json');
-            } catch (FileNotFound $exception) {
-                return "{dumps:[]}";
-            }
-        } catch (\InvalidArgumentException $exception) {
-            $backupFile = sprintf("%s/backup.json", self::$configs["backup_folder"]);
-            if (file_exists($backupFile)) {
-                return file_get_contents($backupFile);
-            } else {
-                return "{dumps:[]}";
-            }
-        }
+        return BackupList::factory();
     }
 
     protected function getRemoteConfig($env)
@@ -391,15 +319,22 @@ class RestoreCommand extends ContainerAwareCommand
         return CommandHelper::executeRemoteCommand("php bin/console sn:backup:get", $config);
     }
 
-    protected function renderList(OutputInterface $output, $configs)
+    /**
+     * @param OutputInterface $output
+     * @param BackupList|RemoteBackupList $config
+     */
+    protected function renderList(OutputInterface $output, $config)
     {
-        $configs = json_decode($configs, true);
-
         $backup = new Table($output);
         $backup->setHeaders(array("ID", "Timestamp", "Version", "Commit"));
-        if (count($configs["dumps"]) > 0) {
-            foreach ($configs["dumps"] as $id => $dump) {
-                $backup->addRow(array($id, date("Y-m-d H-i-s", $dump["timestamp"]), $dump["version"], $dump["commit"]));
+        if ($config->hasBackups()) {
+            foreach ($config->getDumps() as $id => $dump) {
+                $backup->addRow(array(
+                    $id,
+                    date("Y-m-d H-i-s", $dump->getTimestamp()),
+                    $dump->getVersion(),
+                    $dump->getCommit()
+                ));
             }
         }
         $backup->render();
