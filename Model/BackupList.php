@@ -31,11 +31,11 @@ class BackupList implements \JsonSerializable
             return self::$instance;
         }
 
-        if ($this->getFile() == null) {
+        if ($this->getFile() == false) {
             return $this;
         }
 
-        $json_data = file_get_contents($this->getFile()->getRealPath());
+        $json_data = file_get_contents($this->getFile());
         $json_data = json_decode($json_data, true);
         foreach ($json_data["dumps"] as $k => $v) {
             $backup = new Backup();
