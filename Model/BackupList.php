@@ -64,7 +64,7 @@ class BackupList implements \JsonSerializable
     /**
      * @return \SplFileInfo|boolean
      */
-    protected function getFile()
+    public function getFile()
     {
         $file = new \SplFileInfo($this->getAbsolutepath());
 
