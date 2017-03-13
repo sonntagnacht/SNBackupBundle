@@ -19,6 +19,11 @@ class Backup implements \JsonSerializable
     protected $timestamp;
     protected $commit;
 
+    public function remove(){
+        $fs = new Filesystem();
+        $fs->remove($this->getAbsolutepath());
+    }
+
     public function getFilename()
     {
         if ($this->filename == null) {

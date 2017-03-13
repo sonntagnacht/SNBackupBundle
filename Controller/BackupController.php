@@ -2,7 +2,6 @@
 
 namespace SN\BackupBundle\Controller;
 
-use Gaufrette\Exception\FileNotFound;
 use SN\BackupBundle\Model\BackupList;
 use SN\ToolboxBundle\Helper\CommandHelper;
 use Symfony\Bundle\FrameworkBundle\Controller\Controller;
@@ -12,7 +11,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\ResponseHeaderBag;
 use Symfony\Component\Routing\Annotation\Route;
 
-class DefaultController extends Controller
+class BackupController extends Controller
 {
     /**
      * @Route("/", name="backup_list")
@@ -25,7 +24,8 @@ class DefaultController extends Controller
 
         return $this->render('SNBackupBundle:Default:index.html.twig',
             array(
-                "backups" => $backups
+                "backups"     => $backups,
+                "delete_form" => $this->deleteForm()->createView()
             ));
     }
 
@@ -54,10 +54,10 @@ class DefaultController extends Controller
     public function restoreAction(Request $request)
     {
 
-        $config      = $this->getParameter('sn_backup');
-        $list = BackupList::factory();
-        $archive      = $list->getDumps()[$request->get('id')];
-        $tmp         = sprintf("/tmp/%s", $archive->getFilename());
+        $config  = $this->getParameter('sn_backup');
+        $list    = BackupList::factory();
+        $archive = $list->getDumps()[$request->get('id')];
+        $tmp     = sprintf("/tmp/%s", $archive->getFilename());
 
         $fs = new Filesystem();
         $fs->copy($archive->getFile(), $tmp);
@@ -76,5 +76,33 @@ class DefaultController extends Controller
             array(
                 "backup" => $backup
             ));
+    }
+
+    /**
+     * @param Request $request
+     * @Route("/delete", name="backup_delete")
+     * @return \Symfony\Component\HttpFoundation\RedirectResponse
+     */
+    public function deleteAction(Request $request)
+    {
+        $timestamp = $request->get('timestamp');
+        $list      = BackupList::factory();
+        $backup    = $list->getBackup($timestamp);
+        $list->removeBackup($backup);
+        $backup->remove();
+
+        return $this->redirectToRoute('backup_list');
+
+    }
+
+    /**
+     * @return \Symfony\Component\Form\Form|\Symfony\Component\Form\FormInterface
+     */
+    protected function deleteForm()
+    {
+        return $this->createFormBuilder()
+            ->setAction($this->generateUrl('backup_delete'))
+            ->setMethod('DELETE')
+            ->getForm();
     }
 }
