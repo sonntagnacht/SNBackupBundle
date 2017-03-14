@@ -11,6 +11,7 @@
 namespace SN\BackupBundle\Model;
 
 
+use Doctrine\Common\Collections\ArrayCollection;
 use Symfony\Component\Filesystem\Filesystem;
 
 class BackupList implements \JsonSerializable
@@ -23,10 +24,12 @@ class BackupList implements \JsonSerializable
     /**
      * @var array
      */
-    protected $list = ["dumps" => array()];
+    protected $list = array();
 
     public function __construct()
     {
+        $this->list = new ArrayCollection();
+
         if (self::$instance instanceof self) {
             return self::$instance;
         }
@@ -37,14 +40,19 @@ class BackupList implements \JsonSerializable
 
         $json_data = file_get_contents($this->getFile());
         $json_data = json_decode($json_data, true);
-        foreach ($json_data["dumps"] as $k => $v) {
+        foreach ($json_data as $k => $v) {
             $backup = new Backup();
             $backup->setTimestamp($v["timestamp"]);
             $backup->setVersion($v["version"]);
             $backup->setCommit($v["commit"]);
-            $json_data["dumps"][$k] = $backup;
+            $this->list->add($backup);
         }
-        $this->list = $json_data;
+    }
+
+    public function removeBackup(Backup $backup)
+    {
+        $this->list->removeElement($backup);
+        $this->save();
     }
 
     public static function factory()
@@ -104,13 +112,31 @@ class BackupList implements \JsonSerializable
 
     public function addBackup(Backup $backup)
     {
-        array_unshift($this->list["dumps"], $backup);
+        $this->list->add($backup);
         $this->save();
     }
 
     public function hasBackups()
     {
-        return (count($this->list) > 0);
+        return ($this->list->count() > 0);
+    }
+
+    /**
+     * @param $timestamp
+     * @return Backup
+     */
+    public function getBackup($timestamp)
+    {
+        /**
+         * @var $backup Backup
+         */
+        foreach ($this->list as $backup) {
+            if ($backup->getTimestamp() == $timestamp) {
+                dump($backup);
+
+                return $backup;
+            }
+        }
     }
 
     /**
@@ -118,12 +144,12 @@ class BackupList implements \JsonSerializable
      */
     public function getDumps()
     {
-        return $this->list["dumps"];
+        return $this->list;
     }
 
     public function jsonSerialize()
     {
-        return $this->list;
+        return $this->list->toArray();
     }
 
     public function __toString()
