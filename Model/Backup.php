@@ -1,6 +1,7 @@
 <?php
 namespace SN\BackupBundle\Model;
 
+use Gaufrette\File;
 use SN\ToolboxBundle\Helper\CommandHelper;
 use Symfony\Component\Filesystem\Filesystem;
 
@@ -19,9 +20,13 @@ class Backup implements \JsonSerializable
     protected $timestamp;
     protected $commit;
 
-    public function remove(){
-        $fs = new Filesystem();
-        $fs->remove($this->getAbsolutepath());
+    public function remove()
+    {
+        /**
+         * @var $fs \Gaufrette\Filesystem
+         */
+        $fs = Config::get(Config::FILESYSTE);
+        $fs->delete($this->filename);
     }
 
     public function getFilename()
@@ -35,9 +40,13 @@ class Backup implements \JsonSerializable
 
     public function archive_exists()
     {
-        $fs = new Filesystem();
 
-        return $fs->exists($this->getAbsolutepath());
+        /**
+         * @var $fs \Gaufrette\Filesystem
+         */
+        $fs = Config::get(Config::FILESYSTE);
+
+        return $fs->has($this->getFilename());
     }
 
     /**
@@ -52,13 +61,17 @@ class Backup implements \JsonSerializable
     }
 
     /**
-     * @return \SplFileInfo|boolean
+     * @return File|boolean
      */
     public function getFile()
     {
-        $file = new \SplFileInfo($this->getAbsolutepath());
+        /**
+         * @var $fs \Gaufrette\Filesystem
+         */
+        $fs   = Config::get(Config::FILESYSTE);
+        $file = $fs->get($this->getFilename());
 
-        if ($file->isFile() === false) {
+        if ($file->exists() === false) {
             return false;
         }
 
@@ -66,32 +79,15 @@ class Backup implements \JsonSerializable
     }
 
     /**
-     * @return string
-     */
-    protected function getAbsolutepath()
-    {
-        return sprintf("%s/%s", $this->getFilepath(), $this->getFilename());
-    }
-
-    /**
      * @param \SplFileInfo $file
      */
     public function setFile(\SplFileInfo $file)
     {
-        $fs = new Filesystem();
-        $fs->dumpFile($this->getAbsolutepath(), file_get_contents($file->getRealPath()));
-    }
-
-    /**
-     * @return string
-     */
-    protected function getFilepath()
-    {
-        if (Config::get(Config::GAUFRETTE)) {
-            return sprintf("gaufrette://%s", Config::get(Config::BACKUP_FOLDER));
-        }
-
-        return Config::get(Config::BACKUP_FOLDER);
+        /**
+         * @var $fs \Gaufrette\Filesystem
+         */
+        $fs = Config::get(Config::FILESYSTE);
+        $fs->write($this->getFilename(), file_get_contents($file->getRealPath()), true);
     }
 
     /**
@@ -109,8 +105,12 @@ class Backup implements \JsonSerializable
     {
         $tmpFile = sprintf("/tmp/%s.tar.gz", md5(time()));
 
-        $fs = new Filesystem();
-        $fs->copy($this->getAbsolutepath(), $tmpFile);
+        /**
+         * @var $gfs \Gaufrette\Filesystem
+         */
+        $gfs = Config::get(Config::FILESYSTE);
+        $fs  = new Filesystem();
+        $fs->dumpFile($tmpFile, $gfs->read($this->getFilename()));
 
         $cmd = sprintf("tar xfz %s -C %s; rm -rf %s",
             $tmpFile,
@@ -118,6 +118,8 @@ class Backup implements \JsonSerializable
             $tmpFile
         );
         CommandHelper::executeCommand($cmd);
+
+        $fs->remove($tmpFile);
     }
 
     public function insertFrom($srcFolder)
@@ -127,8 +129,12 @@ class Backup implements \JsonSerializable
         $cmd = sprintf("cd %s; tar -czf %s *", $srcFolder, $tmpFile);
         CommandHelper::executeCommand($cmd);
 
-        $fs = new Filesystem();
-        $fs->copy($tmpFile, $this->getAbsolutepath(), true);
+        /**
+         * @var $gfs \Gaufrette\Filesystem
+         */
+        $gfs = Config::get(Config::FILESYSTE);
+
+        $gfs->write(file_get_contents($tmpFile), $this->getFilename(), true);
     }
 
     /**

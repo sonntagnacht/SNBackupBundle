@@ -13,6 +13,7 @@
   ],
   "require": {
     "php": ">=5.6",
+    "knplabs/knp-gaufrette-bundle": "~0.3",
     "symfony/framework-standard-edition": ">=2.8.0",
     "sonntagnacht/toolbox-bundle": "dev-master"
   },
@@ -20,7 +21,6 @@
     "phpunit/phpunit": "3.7.*"
   },
   "suggest": {
-    "knplabs/knp-gaufrette-bundle": "~0.3",
     "sonntagnacht/deploy-bundle": "dev-master"
   },
   "autoload": {

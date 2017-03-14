@@ -13,13 +13,6 @@ sn_backup:
         password: "%database_password%"
 ```
 
-### Local folder
-
-```yaml
-sn_backup:
-    backup_folder: "/var/backup"
-```
-
 ### Gaufrette Filesystem
 
 ```yaml
@@ -46,3 +39,12 @@ Get a list of all snapshots
 Restore a saved snapshot
 
     php bin/console sn:backup:restore [id]
+    
+## WebGUI
+
+```yaml
+SNBackupBundle:
+    resource: "@SNBackupBundle/Controller/"
+    type: annotation
+    prefix: /backup
+```

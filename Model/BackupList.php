@@ -12,7 +12,8 @@ namespace SN\BackupBundle\Model;
 
 
 use Doctrine\Common\Collections\ArrayCollection;
-use Symfony\Component\Filesystem\Filesystem;
+use Gaufrette\Filesystem;
+
 
 class BackupList implements \JsonSerializable
 {
@@ -70,44 +71,31 @@ class BackupList implements \JsonSerializable
     }
 
     /**
-     * @return \SplFileInfo|boolean
+     * @return \Gaufrette\File|boolean
      */
     public function getFile()
     {
-        $file = new \SplFileInfo($this->getAbsolutepath());
+        /**
+         * @var $fs \Gaufrette\Filesystem
+         */
+        $fs = Config::get(Config::FILESYSTE);
 
-        if ($file->isFile() === false) {
+        $file = $fs->get($this->getFilename());
+
+        if ($file->exists() === false) {
             return false;
         }
 
         return $file;
     }
 
-    /**
-     * @return string
-     */
-    protected function getAbsolutepath()
-    {
-        return sprintf("%s/%s", $this->getFilepath(), $this->getFilename());
-    }
-
-    /**
-     * @return string
-     */
-    protected function getFilepath()
-    {
-        if (Config::get(Config::GAUFRETTE)) {
-            return sprintf("gaufrette://%s", Config::get(Config::BACKUP_FOLDER));
-        }
-
-        return Config::get(Config::BACKUP_FOLDER);
-    }
-
     protected function save()
     {
-        $fs               = new Filesystem();
-        $absoluteFilename = sprintf("%s/%s", $this->getFilepath(), $this->getFilename());
-        $fs->dumpFile($absoluteFilename, $this);
+        /**
+         * @var $fs \Gaufrette\Filesystem
+         */
+        $fs = Config::get(Config::FILESYSTE);
+        $fs->write($this->getFilename(), (string) $this, true);
     }
 
     public function addBackup(Backup $backup)

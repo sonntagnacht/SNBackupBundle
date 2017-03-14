@@ -23,7 +23,6 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\DependencyInjection\Exception\ServiceNotFoundException;
 use Symfony\Component\Filesystem\Filesystem;
-use Symfony\Component\Finder\Finder;
 
 class DumpCommand extends ContainerAwareCommand
 {
@@ -289,6 +288,21 @@ class DumpCommand extends ContainerAwareCommand
         }
 
         BackupList::factory()->addBackup($backup);
+    }
+
+    protected function createSQLDump($dest)
+    {
+        $con           = $this->getContainer()->get('doctrine.dbal.default_connection');
+        $schemaManager = $con->getSchemaManager();
+        $mngTables        = $schemaManager->listTables();
+        $tables = array();
+
+        foreach ($mngTables as $table){
+            $tables[] = $table->getName();
+            foreach ($table->getColumns() as $column){
+
+            }
+        }
     }
 
     protected function executeCommand($cmd, $silence = false)

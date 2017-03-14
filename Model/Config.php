@@ -11,15 +11,15 @@
 namespace SN\BackupBundle\Model;
 
 
-
 use Symfony\Component\DependencyInjection\ContainerInterface;
+use Symfony\Component\Filesystem\Filesystem;
 
 class Config
 {
 
     const BACKUP_FOLDER = "backup_folder";
     const DATABASE      = "database";
-    const GAUFRETTE     = "is_gaufrette";
+    const FILESYSTE     = "filesystem";
 
     protected static $config = [];
 
@@ -33,15 +33,11 @@ class Config
     public static function isGaufrette(ContainerInterface $container)
     {
         try {
-            /**
-             * @var $fs \Gaufrette\Filesystem
-             */
-            $container->get('knp_gaufrette.filesystem_map')
-                ->get(self::$config["backup_folder"]);
-
-            self::$config["is_gaufrette"] = true;
+            self::$config["filesystem"] = $container
+                ->get('knp_gaufrette.filesystem_map')
+                ->get(self::$config["backup_folder"]);;
         } catch (\InvalidArgumentException $exception) {
-            self::$config["is_gaufrette"] = false;
+            self::$config["filesystem"] = new Filesystem();
         }
 
         return time();
@@ -52,7 +48,6 @@ class Config
         if (array_key_exists($key, self::$config)) {
             return self::$config[$key];
         }
-
         return null;
     }
 }
