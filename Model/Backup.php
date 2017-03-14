@@ -134,7 +134,7 @@ class Backup implements \JsonSerializable
          */
         $gfs = Config::get(Config::FILESYSTE);
 
-        $gfs->write(file_get_contents($tmpFile), $this->getFilename(), true);
+        $gfs->write($this->getFilename(), file_get_contents($tmpFile), true);
     }
 
     /**

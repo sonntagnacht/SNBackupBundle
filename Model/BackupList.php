@@ -12,7 +12,6 @@ namespace SN\BackupBundle\Model;
 
 
 use Doctrine\Common\Collections\ArrayCollection;
-use Gaufrette\Filesystem;
 
 
 class BackupList implements \JsonSerializable
@@ -39,7 +38,7 @@ class BackupList implements \JsonSerializable
             return $this;
         }
 
-        $json_data = file_get_contents($this->getFile());
+        $json_data = $this->getFile()->getContent();
         $json_data = json_decode($json_data, true);
         foreach ($json_data as $k => $v) {
             $backup = new Backup();
@@ -80,13 +79,11 @@ class BackupList implements \JsonSerializable
          */
         $fs = Config::get(Config::FILESYSTE);
 
-        $file = $fs->get($this->getFilename());
-
-        if ($file->exists() === false) {
+        if ($fs->has($this->getFilename()) === false) {
             return false;
         }
 
-        return $file;
+        return $fs->get($this->getFilename());
     }
 
     protected function save()
@@ -95,7 +92,7 @@ class BackupList implements \JsonSerializable
          * @var $fs \Gaufrette\Filesystem
          */
         $fs = Config::get(Config::FILESYSTE);
-        $fs->write($this->getFilename(), (string) $this, true);
+        $fs->write($this->getFilename(), (string)$this, true);
     }
 
     public function addBackup(Backup $backup)
