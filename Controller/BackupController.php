@@ -6,8 +6,8 @@ use SN\BackupBundle\Model\BackupList;
 use SN\ToolboxBundle\Helper\CommandHelper;
 use Symfony\Bundle\FrameworkBundle\Controller\Controller;
 use Symfony\Component\Filesystem\Filesystem;
-use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\ResponseHeaderBag;
 use Symfony\Component\Routing\Annotation\Route;
 
@@ -32,18 +32,19 @@ class BackupController extends Controller
     /**
      * @Route("/{id}/download", name="backup_download")
      * @param Request $request
-     * @return BinaryFileResponse
+     * @return Response
      */
     public function downloadAction(Request $request)
     {
         $list   = BackupList::factory();
         $backup = $list->getDumps()[$request->get('id')];
 
-        $response = new BinaryFileResponse($backup->getFile());
-        $response->setContentDisposition(
-            ResponseHeaderBag::DISPOSITION_INLINE,
+        $response    = new Response($backup->getFile()->getContent());
+        $disposition = $response->headers->makeDisposition(
+            ResponseHeaderBag::DISPOSITION_ATTACHMENT,
             $backup->getFilename()
         );
+        $response->headers->set('Content-Disposition', $disposition);
 
         return $response;
     }
