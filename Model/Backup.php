@@ -26,7 +26,7 @@ class Backup implements \JsonSerializable
          * @var $fs \Gaufrette\Filesystem
          */
         $fs = Config::get(Config::FILESYSTE);
-        $fs->delete($this->filename);
+        $fs->delete($this->getFilename());
     }
 
     public function getFilename()
