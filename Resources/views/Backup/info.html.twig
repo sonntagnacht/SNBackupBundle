@@ -1,22 +1,6 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport"
-        content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
-  <meta http-equiv="X-UA-Compatible" content="ie=edge">
-  <title>Backup-List</title>
-  <link href="{{ asset("bundles/snbackup/css/bootstrap.min.css") }}" rel="stylesheet"/>
-</head>
-<body>
-<nav class="navbar navbar-default">
-  <div class="container">
-    <div class="navbar-header">
-      <a class="navbar-brand" href="{{ path('backup_list') }}">SN-Backup</a>
-    </div>
-  </div>
-</nav>
-<div class="container">
+{% extends "SNBackupBundle:Backup:base.html.twig" %}
+
+{% block content %}
   <h1>{{ backup.filename }}</h1>
   <dl class="dl-horizontal">
     <dt>Size</dt>
@@ -26,6 +10,4 @@
     <dt>Type</dt>
     <dd>{{ backup.type }}</dd>
   </dl>
-</div>
-</body>
-</html>
+{% endblock %}

@@ -2,7 +2,9 @@
 
 namespace SN\BackupBundle\Controller;
 
+use SN\BackupBundle\Model\Backup;
 use SN\BackupBundle\Model\BackupList;
+use SN\ToolboxBundle\Helper\CommandHelper;
 use Symfony\Bundle\FrameworkBundle\Controller\Controller;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -12,7 +14,7 @@ use Symfony\Component\Routing\Annotation\Route;
 class BackupController extends Controller
 {
     /**
-     * @Route("/", name="backup_list")
+     * @Route("/", name="sn_backup_list")
      * @return \Symfony\Component\HttpFoundation\Response
      */
     public function indexAction()
@@ -28,14 +30,36 @@ class BackupController extends Controller
     }
 
     /**
-     * @Route("/{id}/download", name="backup_download")
+     * @Route("/create", name="sn_backup_create")
+     * @param Request $request
+     * @return Response
+     */
+    public function createAction(Request $request)
+    {
+        $root_dir = $this->get('kernel')->getRootDir();
+        $cmd      = sprintf('php %s/../bin/console sn:backup:dump', $root_dir);
+        CommandHelper::executeCommand($cmd);
+        $url = $this->generateUrl('sn_backup_list');
+
+        $response = $this->render('SNBackupBundle:Backup:create.html.twig');
+        $response->headers->set('Refresh', '3; url=' . $url);
+
+        return $response;
+    }
+
+    /**
+     * @Route("/{id}/download", name="sn_backup_download")
      * @param Request $request
      * @return Response
      */
     public function downloadAction(Request $request)
     {
-        $list   = BackupList::factory();
-        $backup = $list->getDumps()[$request->get('id')];
+        $list    = BackupList::factory();
+        $backups = array_reverse(BackupList::factory()->getDumps()->toArray());
+        /**
+         * @var $backup Backup
+         */
+        $backup = $backups[$request->get('id')];
 
         $response    = new Response($backup->getFile()->getContent());
         $disposition = $response->headers->makeDisposition(
@@ -48,36 +72,38 @@ class BackupController extends Controller
     }
 
     /**
-     * @Route("/{id}/information", name="backup_information" )
+     * @Route("/{id}/information", name="sn_backup_information" )
+     * @param Request $request
+     * @return Response
      */
-    public function restoreAction(Request $request)
+    public function informationAction(Request $request)
     {
 
         $config  = $this->getParameter('sn_backup');
-        $list    = BackupList::factory();
-        $archive = $list->getDumps()[$request->get('id')];
+        $backups = array_reverse(BackupList::factory()->getDumps()->toArray());
+        $backup  = $backups[$request->get('id')];
 
 
         return $this->render('SNBackupBundle:Backup:info.html.twig',
             array(
-                "backup" => $archive
+                "backup" => $backup
             ));
     }
 
     /**
      * @param Request $request
-     * @Route("/delete", name="backup_delete")
+     * @Route("/delete", name="sn_backup_delete")
      * @return \Symfony\Component\HttpFoundation\RedirectResponse
      */
     public function deleteAction(Request $request)
     {
         $timestamp = $request->get('timestamp');
         $list      = BackupList::factory();
-        $backup    = $list->getBackup($timestamp);
+        $backup    = $list->getBackup(new \DateTime("@$timestamp"));
         $list->removeBackup($backup);
         $backup->remove();
 
-        return $this->redirectToRoute('backup_list');
+        return $this->redirectToRoute('sn_backup_list');
 
     }
 
@@ -87,7 +113,7 @@ class BackupController extends Controller
     protected function deleteForm()
     {
         return $this->createFormBuilder()
-            ->setAction($this->generateUrl('backup_delete'))
+            ->setAction($this->generateUrl('sn_backup_delete'))
             ->setMethod('DELETE')
             ->getForm();
     }
