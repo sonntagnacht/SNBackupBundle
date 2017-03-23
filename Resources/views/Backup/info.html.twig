@@ -17,11 +17,15 @@
   </div>
 </nav>
 <div class="container">
-  <h1>{{ backup.name }}</h1>
-  <h3>Files included <span class="label label-default">{{ backup.files|length }}</span></h3>
-  <pre>{% for file in backup.files %}
-{{ file }}
-{% endfor %}</pre>
+  <h1>{{ backup.filename }}</h1>
+  <dl class="dl-horizontal">
+    <dt>Size</dt>
+    <dd>{{ backup.filesize }}</dd>
+    <dt>Date</dt>
+    <dd>{{ backup.timestamp|date('d/m/Y H:i') }}</dd>
+    <dt>Type</dt>
+    <dd>{{ backup.type }}</dd>
+  </dl>
 </div>
 </body>
 </html>

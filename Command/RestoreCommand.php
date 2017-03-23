@@ -10,7 +10,6 @@
 
 namespace SN\BackupBundle\Command;
 
-
 use SN\BackupBundle\Model\BackupList;
 use SN\BackupBundle\Model\Config;
 use SN\BackupBundle\Model\RemoteBackup;
@@ -23,6 +22,7 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Question\ConfirmationQuestion;
+use Symfony\Component\Console\Question\Question;
 use Symfony\Component\DependencyInjection\Exception\ServiceNotFoundException;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Finder\Finder;
@@ -35,30 +35,47 @@ class RestoreCommand extends ContainerAwareCommand
      */
     protected $output;
 
+    /**
+     * @var InputInterface
+     */
+    protected $input;
+
     protected function configure()
     {
         $this->setName("sn:backup:restore")
             ->setDescription("Restore a backup")
             ->addArgument('id', InputArgument::OPTIONAL, 'Id of backup wich will be restore')
-            ->addOption('remote', 'r', InputOption::VALUE_OPTIONAL, 'To load a remote backup.');
+            ->addOption('remote', 'r', InputOption::VALUE_OPTIONAL, 'To load a remote backup.')
+            ->addOption('filter', 'f', InputOption::VALUE_REQUIRED, 'Filter by type');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output)
     {
         self::$configs = $this->getContainer()->getParameter('sn_backup');
         $this->output  = $output;
+        $this->input   = $input;
 
 
         if ($input->getArgument('id') != null) {
             $this->restoreBackup($input->getArgument('id'), $output, $input);
         } else {
+            $backupList = ($input->getOption('remote') == null) ? BackupList::factory() :
+                new RemoteBackupList($input->getOption('remote'), $this->getContainer()
+                    ->getParameter('sn_deploy.environments'));
             $this->renderList(
                 $output,
-                ($input->getOption('remote') == null) ?
-                    BackupList::factory() :
-                    new RemoteBackupList($input->getOption('remote'), $this->getContainer()
-                        ->getParameter('sn_deploy.environments'))
+                $backupList
             );
+
+            $helper   = $this->getHelper('question');
+            $question = new Question(
+                'Please select the backup you will restore: ',
+                null
+            );
+
+            $id = $helper->ask($input, $output, $question);
+            $this->restoreBackup($id, $output, $input);
+
         }
     }
 
@@ -182,6 +199,15 @@ class RestoreCommand extends ContainerAwareCommand
         $databaseName     = $database["dbname"];
         $backupFolder     = Config::get(Config::BACKUP_FOLDER);
         $backupList       = BackupList::factory();
+
+        if (!$backupList->getDumps()->get($id)) {
+            $formatter      = $this->getHelper('formatter');
+            $errorMessages  = array('', 'Backup not found!', '');
+            $formattedBlock = $formatter->formatBlock($errorMessages, 'error');
+            $output->writeln(array('', $formattedBlock));
+
+            return;
+        }
 
         if ($databasePort == null) {
             $databasePort = 3306;
@@ -326,14 +352,18 @@ class RestoreCommand extends ContainerAwareCommand
     protected function renderList(OutputInterface $output, $config)
     {
         $backup = new Table($output);
-        $backup->setHeaders(array("ID", "Timestamp", "Version", "Commit"));
+        $backup->setHeaders(array("ID", "Timestamp", "Type", "Version", "Commit"));
         if ($config->hasBackups()) {
             foreach ($config->getDumps() as $id => $dump) {
+                if ($this->input->getOption('filter') != null && $this->input->getOption('filter') != $dump->getType()) {
+                    continue;
+                }
                 $backup->addRow(array(
                     $id,
-                    date("Y-m-d H-i-s", $dump->getTimestamp()),
+                    date("Y-m-d H-i", $dump->getTimestamp()),
+                    $dump->getType(),
                     $dump->getVersion(),
-                    $dump->getCommit()
+                    $dump->getCommit(true)
                 ));
             }
         }

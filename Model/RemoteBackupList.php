@@ -25,7 +25,7 @@ class RemoteBackupList
         $json_data = json_decode($json_data, true);
         foreach ($json_data["dumps"] as $k => $v) {
             $backup = new Backup();
-            $backup->setTimestamp($v["timestamp"]);
+            $backup->setDateTime($v["timestamp"]);
             $backup->setVersion($v["version"]);
             $backup->setCommit($v["commit"]);
             $json_data["dumps"][$k] = $backup;

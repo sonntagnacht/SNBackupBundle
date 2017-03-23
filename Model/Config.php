@@ -20,6 +20,7 @@ class Config
     const BACKUP_FOLDER = "backup_folder";
     const DATABASE      = "database";
     const FILESYSTE     = "filesystem";
+    const FILESYSTEM    = "filesystem";
 
     protected static $config = [];
 
@@ -35,7 +36,7 @@ class Config
         try {
             self::$config["filesystem"] = $container
                 ->get('knp_gaufrette.filesystem_map')
-                ->get(self::$config["backup_folder"]);;
+                ->get(self::$config["backup_folder"]);
         } catch (\InvalidArgumentException $exception) {
             self::$config["filesystem"] = new Filesystem();
         }
@@ -48,6 +49,7 @@ class Config
         if (array_key_exists($key, self::$config)) {
             return self::$config[$key];
         }
+
         return null;
     }
 }

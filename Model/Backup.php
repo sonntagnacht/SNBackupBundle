@@ -15,10 +15,26 @@ use Symfony\Component\Filesystem\Filesystem;
  */
 class Backup implements \JsonSerializable
 {
+
+    const TYPE_DAILY   = 'daily';
+    const TYPE_WEEKLY  = 'weekly';
+    const TYPE_MONTHLY = 'monthly';
+    const TYPE_YEARLY  = 'yearly';
+
+
     protected $filename = null;
     protected $version;
-    protected $timestamp;
+    protected $type = null;
+    /**
+     * @var \DateTime
+     */
+    protected $dateTime;
     protected $commit;
+
+    public function __construct()
+    {
+        $this->dateTime = new \DateTime();
+    }
 
     public function remove()
     {
@@ -26,13 +42,18 @@ class Backup implements \JsonSerializable
          * @var $fs \Gaufrette\Filesystem
          */
         $fs = Config::get(Config::FILESYSTE);
-        $fs->delete($this->getFilename());
+        $fs->delete($this->getAbsolutePath());
+    }
+
+    public function getAbsolutePath()
+    {
+        return sprintf("%s/%s", $this->getType(), $this->getFilename());
     }
 
     public function getFilename()
     {
         if ($this->filename == null) {
-            return sprintf("%s.tar.gz", date("Y-m-d_H-i-s", $this->getTimestamp()));
+            return sprintf("%s.tar.gz", date("Y-m-d_H-i", $this->getTimestamp()));
         }
 
         return sprintf("%s.tar.gz", $this->filename);
@@ -46,7 +67,7 @@ class Backup implements \JsonSerializable
          */
         $fs = Config::get(Config::FILESYSTE);
 
-        return $fs->has($this->getFilename());
+        return $fs->has($this->getAbsolutePath());
     }
 
     /**
@@ -61,6 +82,26 @@ class Backup implements \JsonSerializable
     }
 
     /**
+     * @return string
+     */
+    public function getFilesize($decimals = 2)
+    {
+        $bytes = $this->getFile()->getSize();
+        $size = array(
+            "Bytes",
+            "kB",
+            "MB",
+            "GB",
+            "TB",
+            "PB"
+        );
+        $factor = floor((strlen($bytes) - 1) / 3);
+
+        return sprintf("%.{$decimals}f %s", $bytes / pow(1024, $factor), $size[$factor]);
+
+    }
+
+    /**
      * @return File|boolean
      */
     public function getFile()
@@ -69,13 +110,29 @@ class Backup implements \JsonSerializable
          * @var $fs \Gaufrette\Filesystem
          */
         $fs   = Config::get(Config::FILESYSTE);
-        $file = $fs->get($this->getFilename());
+        $file = $fs->get($this->getAbsolutePath());
 
         if ($file->exists() === false) {
             return false;
         }
 
         return $file;
+    }
+
+    /**
+     * @return \DateTime
+     */
+    public function getDateTime()
+    {
+        return $this->dateTime;
+    }
+
+    /**
+     * @param \DateTime $dateTime
+     */
+    public function setDateTime(\DateTime $dateTime)
+    {
+        $this->dateTime = $dateTime;
     }
 
     /**
@@ -87,7 +144,7 @@ class Backup implements \JsonSerializable
          * @var $fs \Gaufrette\Filesystem
          */
         $fs = Config::get(Config::FILESYSTE);
-        $fs->write($this->getFilename(), file_get_contents($file->getRealPath()), true);
+        $fs->write($this->getAbsolutePath(), file_get_contents($file->getRealPath()), true);
     }
 
     /**
@@ -110,7 +167,7 @@ class Backup implements \JsonSerializable
          */
         $gfs = Config::get(Config::FILESYSTE);
         $fs  = new Filesystem();
-        $fs->dumpFile($tmpFile, $gfs->read($this->getFilename()));
+        $fs->dumpFile($tmpFile, $gfs->read($this->getAbsolutePath()));
 
         $cmd = sprintf("tar xfz %s -C %s; rm -rf %s",
             $tmpFile,
@@ -134,7 +191,7 @@ class Backup implements \JsonSerializable
          */
         $gfs = Config::get(Config::FILESYSTE);
 
-        $gfs->write($this->getFilename(), file_get_contents($tmpFile), true);
+        $gfs->write($this->getAbsolutePath(), file_get_contents($tmpFile), true);
     }
 
     /**
@@ -150,22 +207,26 @@ class Backup implements \JsonSerializable
      */
     public function getTimestamp()
     {
-        return $this->timestamp;
+        return $this->dateTime->getTimestamp();
     }
 
     /**
-     * @param mixed $timestamp
+     * @param int $timestamp
      */
     public function setTimestamp($timestamp)
     {
-        $this->timestamp = $timestamp;
+        $this->dateTime = \DateTime::createFromFormat('U', $timestamp);
     }
 
     /**
      * @return mixed
      */
-    public function getCommit()
+    public function getCommit($short = false)
     {
+        if ($short) {
+            return substr($this->commit, 0, 7);
+        }
+
         return $this->commit;
     }
 
@@ -177,12 +238,23 @@ class Backup implements \JsonSerializable
         $this->commit = $commit;
     }
 
-    function jsonSerialize()
+    public function getType()
+    {
+        return $this->type;
+    }
+
+    public function setType($type)
+    {
+        $this->type = $type;
+    }
+
+    public function jsonSerialize()
     {
         return [
             "timestamp" => $this->getTimestamp(),
             "version"   => $this->getVersion(),
-            "commit"    => $this->getCommit()
+            "commit"    => $this->getCommit(),
+            "type"      => $this->getType()
         ];
     }
 

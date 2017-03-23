@@ -11,13 +11,13 @@
 namespace SN\BackupBundle\Command;
 
 
-use Gaufrette\Exception\FileNotFound;
 use SN\BackupBundle\Model\Backup;
 use SN\BackupBundle\Model\BackupList;
 use SN\BackupBundle\Model\Config;
 use SN\DeployBundle\Services\Version;
 use SN\ToolboxBundle\Helper\CommandHelper;
 use Symfony\Bundle\FrameworkBundle\Command\ContainerAwareCommand;
+use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -41,66 +41,18 @@ class DumpCommand extends ContainerAwareCommand
 
     protected function configure()
     {
+        $backupTypeDescription = sprintf('The type of the backup [%s]',
+            join(',', array(Backup::TYPE_DAILY, Backup::TYPE_MONTHLY, Backup::TYPE_WEEKLY, Backup::TYPE_YEARLY)));
+
         $this->setName("sn:backup:dump")
             ->setDescription("Take a snapshot of your current application.")
+            ->addArgument('type',
+                InputArgument::OPTIONAL,
+                $backupTypeDescription,
+                Backup::TYPE_DAILY)
             ->addOption('remote', 'r', InputOption::VALUE_OPTIONAL, 'Take a snapshot from remote Server.')
             ->addOption('full', 'f', InputOption::VALUE_NONE, 'Take a backup with webfolder.')
             ->addOption('current', 'c', InputOption::VALUE_NONE, 'Without saving');
-    }
-
-    protected function copyToBackup($archive, $name)
-    {
-
-        try {
-            /**
-             * @var $fs \Gaufrette\Filesystem
-             */
-            $fs = $this->getContainer()
-                ->get('knp_gaufrette.filesystem_map')
-                ->get(self::$configs["backup_folder"]);
-            $fs->write(
-                $name,
-                file_get_contents($archive)
-            );
-            $this->executeCommand(sprintf("rm -rf %s", $archive));
-        } catch (\InvalidArgumentException $exception) {
-            $this->executeCommand(sprintf("mv %s %s", $archive, self::$configs["backup_folder"]));
-        }
-    }
-
-    /**
-     * @return mixed
-     */
-    protected function loadDumpInformations()
-    {
-        try {
-            /**
-             * @var $fs \Gaufrette\Filesystem
-             */
-            $fs = $this->getContainer()
-                ->get('knp_gaufrette.filesystem_map')
-                ->get(self::$configs["backup_folder"]);
-            try {
-                $content = $fs->read('backup.json');
-            } catch (FileNotFound $exception) {
-                $content = "";
-            }
-        } catch (\InvalidArgumentException $exception) {
-            $backupFile = sprintf("%s/backup.json", self::$configs["backup_folder"]);
-            if (file_exists($backupFile)) {
-                $content = file_get_contents($backupFile);
-            } else {
-                $content = "";
-            }
-        }
-
-        self::$buInformations = json_decode($content, true);
-
-        if (!is_array(self::$buInformations["dumps"])) {
-            self::$buInformations["dumps"] = array();
-        }
-
-        return self::$buInformations;
     }
 
     /**
@@ -133,36 +85,25 @@ class DumpCommand extends ContainerAwareCommand
         array_unshift(self::$buInformations["dumps"], self::$dump);
     }
 
-    protected function saveDumpInformations()
-    {
-        $content = json_encode(self::$buInformations);
-
-        try {
-            // Gaufrette filesystem
-
-            /**
-             * @var $fs \Gaufrette\Filesystem
-             */
-            $fs      = $this->getContainer()
-                ->get('knp_gaufrette.filesystem_map')
-                ->get(self::$configs["backup_folder"]);
-            $content = $fs->write("backup.json", $content, true);
-        } catch (\InvalidArgumentException $exception) {
-            // Local filesystem
-
-            /**
-             * @var $fs Filesystem
-             */
-            $fs         = new Filesystem();
-            $backupFile = sprintf("%s/backup.json", self::$configs["backup_folder"]);
-            $fs->dumpFile($backupFile, $content);
-        }
-    }
-
     protected function execute(InputInterface $input, OutputInterface $output)
     {
         $this->input  = $input;
         $this->output = $output;
+
+        if (!in_array($this->input->getArgument('type'),
+            array(
+                Backup::TYPE_DAILY,
+                Backup::TYPE_WEEKLY,
+                Backup::TYPE_MONTHLY,
+                Backup::TYPE_YEARLY
+            ))
+        ) {
+            throw new \InvalidArgumentException(sprintf('The type [%s] is unknown.',
+                $this->input->getArgument('type')));
+        }
+
+        $backup = new Backup();
+        $backup->setType($input->getArgument('type'));
 
         if ($input->getOption('remote') != null) {
             $env           = $input->getOption('remote');
@@ -189,8 +130,6 @@ class DumpCommand extends ContainerAwareCommand
         $databaseName     = $database["dbname"];
         $backupFolder     = Config::get(Config::BACKUP_FOLDER);
 
-        $this->loadDumpInformations();
-
 
         if ($databasePort == null) {
             $databasePort = 3306;
@@ -207,42 +146,38 @@ class DumpCommand extends ContainerAwareCommand
 
         $this->executeCommand($cmd);
 
-        try {
-            $gaufrette = $this->getContainer()->get('knp_gaufrette.filesystem_map');
+        $gaufrette = $this->getContainer()->get('knp_gaufrette.filesystem_map');
 
 
-            foreach ($gaufrette as $folder => $gfs) {
-                if ($folder == $backupFolder) {
-                    continue;
-                }
-
-                $fs->mkdir(sprintf("%s/%s",
-                    $tempFolder,
-                    $folder));
-                /**
-                 * @var $gfs \Gaufrette\Filesystem
-                 */
-                $files = $gfs->keys();
-
-                foreach ($files as $file) {
-                    if ($gfs->isDirectory($file)) {
-                        $fs->mkdir(sprintf("%s/%s/%s",
-                            $tempFolder,
-                            $folder,
-                            $file));
-                    } else {
-                        $data = $gfs->read($file);
-                        $fs->dumpFile(
-                            sprintf("%s/%s/%s",
-                                $tempFolder,
-                                $folder,
-                                $file),
-                            $data);
-                    }
-                }
+        foreach ($gaufrette as $folder => $gfs) {
+            if ($folder == $backupFolder) {
+                continue;
             }
 
-        } catch (ServiceNotFoundException $exception) {
+            $fs->mkdir(sprintf("%s/%s",
+                $tempFolder,
+                $folder));
+            /**
+             * @var $gfs \Gaufrette\Filesystem
+             */
+            $files = $gfs->keys();
+
+            foreach ($files as $file) {
+                if ($gfs->isDirectory($file)) {
+                    $fs->mkdir(sprintf("%s/%s/%s",
+                        $tempFolder,
+                        $folder,
+                        $file));
+                } else {
+                    $data = $gfs->read($file);
+                    $fs->dumpFile(
+                        sprintf("%s/%s/%s",
+                            $tempFolder,
+                            $folder,
+                            $file),
+                        $data);
+                }
+            }
         }
 
         if ($input->getOption('full')) {
@@ -256,10 +191,9 @@ class DumpCommand extends ContainerAwareCommand
             $this->executeCommand($cmd);
         }
 
-        $timestamp = time();
         if ($input->getOption('current')) {
 
-            $currentFolder = sprintf("/tmp/%s", md5($timestamp));
+            $currentFolder = sprintf("/tmp/%s", md5($backup->getTimestamp()));
             $cmd           = sprintf("cp -r %s %s", $tempFolder, $currentFolder);
 
             $this->executeCommand($cmd);
@@ -269,9 +203,6 @@ class DumpCommand extends ContainerAwareCommand
 
             return;
         }
-
-        $backup = new Backup();
-        $backup->setTimestamp($timestamp);
         $backup->insertFrom($tempFolder);
         $fs->remove($tempFolder);
 
@@ -294,12 +225,12 @@ class DumpCommand extends ContainerAwareCommand
     {
         $con           = $this->getContainer()->get('doctrine.dbal.default_connection');
         $schemaManager = $con->getSchemaManager();
-        $mngTables        = $schemaManager->listTables();
-        $tables = array();
+        $mngTables     = $schemaManager->listTables();
+        $tables        = array();
 
-        foreach ($mngTables as $table){
+        foreach ($mngTables as $table) {
             $tables[] = $table->getName();
-            foreach ($table->getColumns() as $column){
+            foreach ($table->getColumns() as $column) {
 
             }
         }

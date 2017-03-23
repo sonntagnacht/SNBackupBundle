@@ -1,3 +1,3 @@
 sn_backup_homepage:
     path:     /
-    defaults: { _controller: SNBackupBundle:Default:index }
+    defaults: { _controller: SNBackupBundle:Backup:index }

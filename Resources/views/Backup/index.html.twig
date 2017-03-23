@@ -24,7 +24,8 @@
     <thead>
     <tr>
       <th>ID</th>
-      <th>Timestamp</th>
+      <th>Date</th>
+      <th>Type</th>
       <th>Version</th>
       <th>Commit</th>
       <th></th>
@@ -34,9 +35,10 @@
     {% for backup in backups %}
       <tr>
         <td class="col-md-1">{{ loop.index0 }}</td>
-        <td class="col-md-2">{{ backup.timestamp|date("Y-m-d H:i") }}</td>
-        <td class="col-md-3">{{ backup.version }}</td>
-        <td class="col-md-4">{{ backup.commit }}</td>
+        <td class="col-md-3">{{ backup.timestamp|date('d/m/Y H:i') }}</td>
+        <td class="col-md-2">{{ backup.type }}</td>
+        <td class="col-md-2">{{ backup.version }}</td>
+        <td class="col-md-2">{{ backup.commit(true) }}</td>
         <td class="col-md-2 text-right">
           <div class="btn-group">
             <a class="btn btn-default" href="{{ path('backup_information', {id: loop.index0 }) }}" title="Informations"><i
