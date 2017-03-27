@@ -22,14 +22,6 @@ class Configuration implements ConfigurationInterface
 
         $rootNode->children()
             ->scalarNode('backup_folder')->end()
-            ->arrayNode('database')
-            ->children()
-                ->scalarNode('type')->defaultValue('mysql')->end()
-                ->scalarNode('host')->end()
-                ->scalarNode('user')->end()
-                ->scalarNode('password')->end()
-                ->scalarNode('port')->defaultValue(null)->end()
-                ->scalarNode('dbname')->end()
             ->end();
 
         // Here you should define the parameters that are allowed to

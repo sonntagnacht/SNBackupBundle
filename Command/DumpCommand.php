@@ -102,6 +102,7 @@ class DumpCommand extends ContainerAwareCommand
                 $this->input->getArgument('type')));
         }
 
+
         $backup = new Backup();
         $backup->setType($input->getArgument('type'));
 
@@ -116,35 +117,15 @@ class DumpCommand extends ContainerAwareCommand
 
         $fs         = new Filesystem();
         $tempFolder = sprintf("/tmp/sn_backup");
-        $database   = Config::get(Config::DATABASE);
 
         // prepare backup folder
         $fs->remove($tempFolder);
         $fs->mkdir($tempFolder);
 
         // Get configs
-        $databaseUser     = $database["user"];
-        $databaseHost     = $database["host"];
-        $databasePort     = $database["port"];
-        $databasePassword = $database["password"];
-        $databaseName     = $database["dbname"];
         $backupFolder     = Config::get(Config::BACKUP_FOLDER);
 
-
-        if ($databasePort == null) {
-            $databasePort = 3306;
-        }
-
-        $cmd = sprintf("mysqldump -h %s -u %s -P %s --password='%s' --compress %s > %s/database.sql",
-            $databaseHost,
-            $databaseUser,
-            $databasePort,
-            $databasePassword,
-            $databaseName,
-            $tempFolder
-        );
-
-        $this->executeCommand($cmd);
+        $this->dumpDatabase(sprintf("%s/database.json", $tempFolder));
 
         $gaufrette = $this->getContainer()->get('knp_gaufrette.filesystem_map');
 
@@ -221,19 +202,27 @@ class DumpCommand extends ContainerAwareCommand
         BackupList::factory()->addBackup($backup);
     }
 
-    protected function createSQLDump($dest)
+    protected function dumpDatabase($dest)
     {
+
         $con           = $this->getContainer()->get('doctrine.dbal.default_connection');
         $schemaManager = $con->getSchemaManager();
         $mngTables     = $schemaManager->listTables();
         $tables        = array();
 
         foreach ($mngTables as $table) {
-            $tables[] = $table->getName();
-            foreach ($table->getColumns() as $column) {
-
+            $cols   = array();
+            $query    = sprintf("SELECT * FROM %s", $table->getName());
+            $statement = $con->executeQuery($query);
+            while ($result =  $statement->fetchAll() ) {
+                $cols[] = $result;
             }
+            $tables[$table->getName()] = $cols;
         }
+
+        $fs = new Filesystem();
+        $fs->dumpFile($dest, json_encode($tables));
+
     }
 
     protected function executeCommand($cmd, $silence = false)

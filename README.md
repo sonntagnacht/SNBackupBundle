@@ -1,19 +1,10 @@
 # SNBackupBundle
 
+This BackupBundle can create backups from type daily, weekly, monthly or yearly. It'll save your default database and GaufretteFilesystems to tar.gz-archive in a GaufretteFilesystem.
+
 ## Configuration
 
 config.yml
-
-```yaml
-sn_backup:
-    database:
-        host: "%database_host%"
-        dbname: "%database_name%"
-        user: "%database_user%"
-        password: "%database_password%"
-```
-
-### Gaufrette Filesystem
 
 ```yaml
 knp_gaufrette:
@@ -30,7 +21,7 @@ sn_backup:
 
 Take a snapshot of your current webapplication
 
-    php bin/console sn:backup:dump
+    php bin/console sn:backup:dump [daily|weekly|monthly|yearly]
 
 Get a list of all snapshots
 
@@ -39,6 +30,10 @@ Get a list of all snapshots
 Restore a saved snapshot
 
     php bin/console sn:backup:restore [id]
+    
+Delete backups whiche are older than seven days.
+
+    php bin/console sn:backup:cleanup [daily|weekly|monthly|yearly] 7d
     
 ## WebGUI
 

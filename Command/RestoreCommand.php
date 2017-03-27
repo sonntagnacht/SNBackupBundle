@@ -191,13 +191,6 @@ class RestoreCommand extends ContainerAwareCommand
     protected function restoreBackup($id, OutputInterface $output, InputInterface $input)
     {
         $extractFolder    = sprintf("%s/../var/sn_backup", $this->getContainer()->get('kernel')->getRootDir());
-        $database         = Config::get(Config::DATABASE);
-        $databaseUser     = $database["user"];
-        $databaseHost     = $database["host"];
-        $databasePort     = $database["port"];
-        $databasePassword = $database["password"];
-        $databaseName     = $database["dbname"];
-        $backupFolder     = Config::get(Config::BACKUP_FOLDER);
         $backupList       = BackupList::factory();
 
         if (!$backupList->getDumps()->get($id)) {
@@ -207,10 +200,6 @@ class RestoreCommand extends ContainerAwareCommand
             $output->writeln(array('', $formattedBlock));
 
             return;
-        }
-
-        if ($databasePort == null) {
-            $databasePort = 3306;
         }
 
         if ($input->getOption('remote') == null) {
@@ -264,15 +253,8 @@ class RestoreCommand extends ContainerAwareCommand
         }
 
         // Database import
-        $cmd = sprintf("mysql -h %s -u %s -P %s --password='%s' %s < %s/database.sql",
-            $databaseHost,
-            $databaseUser,
-            $databasePort,
-            $databasePassword,
-            $databaseName,
-            $extractFolder
-        );
-        CommandHelper::executeCommand($cmd);
+        $src = sprintf("%s/database.json", $extractFolder);
+        $this->importDatabase($src);
 
         $cmd = "git rev-parse --is-inside-work-tree";
 
@@ -368,5 +350,42 @@ class RestoreCommand extends ContainerAwareCommand
             }
         }
         $backup->render();
+    }
+
+    protected function importDatabase($src)
+    {
+        $json_string = file_get_contents($src);
+        $database    = json_decode($json_string, true);
+
+        $con = $this->getContainer()->get('doctrine.dbal.default_connection');
+        $con->exec('SET foreign_key_checks = 0');
+        $schemaManager = $con->getSchemaManager();
+        $mngTables     = $schemaManager->listTables();
+
+        foreach ($mngTables as $table) {
+            $schemaManager->dropTable($table->getName());
+        }
+
+        $cmd = sprintf("php %s/../bin/console doctrine:schema:create",
+            $this->getContainer()->get('kernel')->getRootDir());
+        CommandHelper::executeCommand($cmd);
+
+        foreach ($database as $tablename => $table) {
+            foreach ($table as $cols) {
+                foreach ($cols as $col) {
+                    $values = array();
+                    foreach ($col as $key => $value) {
+                        if ($value == "") {
+                            $values[] = sprintf("%s = null", $key);
+                        } else {
+                            $values[] = sprintf("%s = \"%s\"", $key, addslashes($value));
+                        }
+                    }
+                    $con->exec(sprintf("INSERT INTO %s SET %s;", $tablename, join(',', $values)));
+                }
+            }
+        }
+
+        $con->exec('SET foreign_key_checks = 1');
     }
 }
