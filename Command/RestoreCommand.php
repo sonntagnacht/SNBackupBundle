@@ -252,10 +252,6 @@ class RestoreCommand extends ContainerAwareCommand
             }
         }
 
-        // Database import
-        $src = sprintf("%s/database.json", $extractFolder);
-        $this->importDatabase($src);
-
         $cmd = "git rev-parse --is-inside-work-tree";
 
         // git reset
@@ -273,6 +269,10 @@ class RestoreCommand extends ContainerAwareCommand
                 CommandHelper::executeCommand($cmd);
             }
         }
+
+        // Database import
+        $src = sprintf("%s/database.json", $extractFolder);
+        $this->importDatabase($src);
 
         try {
             $gaufrette = $this->getContainer()->get('knp_gaufrette.filesystem_map');
