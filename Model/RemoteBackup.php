@@ -19,10 +19,10 @@ class RemoteBackup extends Backup
     protected $sshConfig;
     protected $id;
 
-    public function __construct($env, array $envConfig, $id)
+    public function __construct($env, $envConfig, $id)
     {
         $this->setFilename($env);
-        $this->sshConfig = $envConfig[$env];
+        $this->sshConfig = $envConfig;
         $this->id        = $id;
     }
 
@@ -31,16 +31,18 @@ class RemoteBackup extends Backup
      */
     public function extractTo($dstFolder, OutputInterface $output = null)
     {
-        $tmpFolder = sprintf("/tmp/%s", md5(time()));
-
         // extract local-remote archive if exists
         if ($this->archive_exists()) {
             parent::extractTo($dstFolder);
         }
 
+        $output->writeln("collect");
+
         // extract archive on remote
-        $srcFolder = CommandHelper::executeRemoteCommand(sprintf("php bin/console sn:backup:dump -c"),
+        $srcFolder = CommandHelper::executeRemoteCommand(sprintf("php bin/console sn:backup:get %s", $this->id),
             $this->sshConfig);
+
+        $output->writeln($srcFolder);
 
         // download remote archive to local
         $cmd = sprintf(
@@ -54,7 +56,7 @@ class RemoteBackup extends Backup
         CommandHelper::executeCommand($cmd, $output);
 
         // Clean up tmp on remote
-        CommandHelper::executeRemoteCommand(sprintf("php bin/console sn:backup:dump -c %s", $srcFolder),
+        CommandHelper::executeRemoteCommand(sprintf("php bin/console sn:backup:get --clean %s", $srcFolder),
             $this->sshConfig);
 
         // save remote archive in local archive

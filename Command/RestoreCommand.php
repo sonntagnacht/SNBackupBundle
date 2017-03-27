@@ -10,12 +10,13 @@
 
 namespace SN\BackupBundle\Command;
 
+use SN\BackupBundle\Model\Backup;
 use SN\BackupBundle\Model\BackupList;
-use SN\BackupBundle\Model\Config;
 use SN\BackupBundle\Model\RemoteBackup;
 use SN\BackupBundle\Model\RemoteBackupList;
 use SN\ToolboxBundle\Helper\CommandHelper;
 use Symfony\Bundle\FrameworkBundle\Command\ContainerAwareCommand;
+use Symfony\Component\Console\Helper\ProgressBar;
 use Symfony\Component\Console\Helper\Table;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
@@ -75,8 +76,11 @@ class RestoreCommand extends ContainerAwareCommand
 
             $id = $helper->ask($input, $output, $question);
             $this->restoreBackup($id, $output, $input);
-
         }
+    }
+
+    protected function restoreRemoteBackup($env, $id)
+    {
     }
 
 
@@ -138,44 +142,13 @@ class RestoreCommand extends ContainerAwareCommand
         CommandHelper::executeCommand($cmd);
     }
 
-    protected function getRemoteBackup($env, $id, $extractFolder)
+    protected function getRemoteBackup($env, $id)
     {
+
+        $extractFolder = sprintf("%s/../var/sn_backup", $this->getContainer()->get('kernel')->getRootDir());
         $remoteConfigs = $this->getContainer()->getParameter('sn_deploy.environments');
-        $config        = $remoteConfigs[$env];
 
-        $srcFolder = CommandHelper::executeRemoteCommand(sprintf("php bin/console sn:backup:get %s", $id), $config);
-
-        $localArchive = sprintf("%s/%s.tar.gz", self::$configs['backup_folder'], $env);
-
-        if (file_exists($localArchive)) {
-            $cmd = sprintf("rm -Rf %s; mkdir %s; tar xfz %s -C %s",
-                $extractFolder,
-                $extractFolder,
-                $localArchive,
-                $extractFolder);
-
-            CommandHelper::executeCommand($cmd);
-        }
-
-        $cmd = sprintf(
-            "rsync --delete --info=progress2 -r --rsh='ssh -p %s' %s@%s:%s/* %s/",
-            $config["port"],
-            $config["user"],
-            $config["host"],
-            $srcFolder,
-            $extractFolder
-        );
-        CommandHelper::executeCommand($cmd, $this->output);
-
-        $cmd = sprintf("cd %s; tar -czf %s *",
-            $extractFolder,
-            $localArchive);
-
-        CommandHelper::executeCommand($cmd);
-
-        $this->output->writeln(CommandHelper::executeRemoteCommand(sprintf("php bin/console sn:backup:get -c %s",
-            $srcFolder),
-            $config));
+        return new RemoteBackup($env, $remoteConfigs[$env], $id);
     }
 
     protected function getRemoteCurrentConfig($env)
@@ -190,46 +163,32 @@ class RestoreCommand extends ContainerAwareCommand
 
     protected function restoreBackup($id, OutputInterface $output, InputInterface $input)
     {
-        $extractFolder    = sprintf("%s/../var/sn_backup", $this->getContainer()->get('kernel')->getRootDir());
-        $backupList       = BackupList::factory();
-
-        if (!$backupList->getDumps()->get($id)) {
-            $formatter      = $this->getHelper('formatter');
-            $errorMessages  = array('', 'Backup not found!', '');
-            $formattedBlock = $formatter->formatBlock($errorMessages, 'error');
-            $output->writeln(array('', $formattedBlock));
-
-            return;
+        $extractFolder = sprintf("%s/../var/sn_backup", $this->getContainer()->get('kernel')->getRootDir());
+        $fs            = new Filesystem();
+        try {
+            $fs->remove($extractFolder);
+        } catch (\Exception $e) {
         }
-
-        if ($input->getOption('remote') == null) {
-            $backupConfig = json_decode($this->getLocalConfig(), true);
-
-            if (!$backupList->hasBackups()) {
-                $output->writeln(CommandHelper::writeError("Backup not found!"));
-
-                return;
-            }
-
-            $backup = $backupList->getDumps()[$id];
-        }
-
-        $fs = new Filesystem();
-        $fs->remove($extractFolder);
         $fs->mkdir($extractFolder);
 
         if ($input->getOption('remote') == null) {
+            $backupList = BackupList::factory();
+            /**
+             * @var $backup Backup
+             */
+            $backup = $backupList->getDumps()->get($id);
+            if (!$backup) {
+                $formatter      = $this->getHelper('formatter');
+                $errorMessages  = array('', 'Backup not found!', '');
+                $formattedBlock = $formatter->formatBlock($errorMessages, 'error');
+                $output->writeln(array('', $formattedBlock));
+
+                return;
+            }
             $backup->extractTo($extractFolder);
         } else {
-            $env = $input->getOption('remote');
-            if ($input->getArgument('id') == "c") {
-                $backup = new RemoteBackup($env, $this->getContainer()->getParameter('sn_deploy.environments'), 'c');
-                $backup->extractTo($extractFolder, $output);
-            } else {
-                $backupConfig = json_decode($this->getRemoteConfig($env), true);
-                $dump         = $backupConfig["dumps"][$id];
-                $this->getRemoteBackup($env, $id, $extractFolder);
-            }
+            $backup = $this->getRemoteBackup($input->getOption('remote'), $id, $extractFolder);
+            $backup->extractTo($extractFolder, $this->output);
         }
 
         $app_folder = sprintf("%s/_app", $extractFolder);
@@ -370,7 +329,14 @@ class RestoreCommand extends ContainerAwareCommand
             $this->getContainer()->get('kernel')->getRootDir());
         CommandHelper::executeCommand($cmd);
 
+        $tables = count($database);
+
+        $progress = new ProgressBar($this->output, $tables);
+        $progress->setFormat(' %current%/%max% --- %message%');
+        $progress->start();
+
         foreach ($database as $tablename => $table) {
+            $progress->setMessage("Import data records [$tablename]");
             foreach ($table as $cols) {
                 foreach ($cols as $col) {
                     $values = array();
@@ -384,7 +350,9 @@ class RestoreCommand extends ContainerAwareCommand
                     $con->exec(sprintf("INSERT INTO %s SET %s;", $tablename, join(',', $values)));
                 }
             }
+            $progress->advance();
         }
+        $progress->finish();
 
         $con->exec('SET foreign_key_checks = 1');
     }

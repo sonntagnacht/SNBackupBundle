@@ -11,15 +11,15 @@
 namespace SN\BackupBundle\Command;
 
 
+use Gaufrette\Filesystem;
+use SN\BackupBundle\Model\Backup;
 use SN\BackupBundle\Model\BackupList;
-use SN\DeployBundle\Services\Version;
 use SN\ToolboxBundle\Helper\CommandHelper;
 use Symfony\Bundle\FrameworkBundle\Command\ContainerAwareCommand;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
-use Symfony\Component\DependencyInjection\Exception\ServiceNotFoundException;
 
 class GetCommand extends ContainerAwareCommand
 {
@@ -44,34 +44,6 @@ class GetCommand extends ContainerAwareCommand
 
         if ($id != null) {
 
-            if ($id == "c") {
-
-                try {
-                    /**
-                     * @var $sn_deploy Version
-                     */
-                    $sn_deploy  = $this->getContainer()->get('sn_deploy.twig');
-                    $commit     = $sn_deploy->getCommit();
-                    $commitLong = $sn_deploy->getCommit(false);
-                    $version    = $sn_deploy->getVersion();
-                } catch (ServiceNotFoundException $exception) {
-                    $commit     = null;
-                    $commitLong = null;
-                    $version    = null;
-                }
-
-                $dump = [
-                    "timestamp"   => time(),
-                    "commit"      => $commit,
-                    "commit_long" => $commitLong,
-                    "version"     => $version
-                ];
-
-                $output->writeln(json_encode($dump));
-
-                return;
-            }
-
             if ($input->getOption('clean') == null) {
                 $this->getBackup($id, $output);
             } else {
@@ -94,50 +66,31 @@ class GetCommand extends ContainerAwareCommand
 
     protected function getBackup($id, OutputInterface $output)
     {
-        $configs      = self::$configs;
-        $backupFolder = $configs["backup_folder"];
-        $backupConfig = json_decode($this->getConfig(), true);
+        if ($id == "c") {
+            $path = CommandHelper::executeCommand(sprintf("php %s/../bin/console sn:backup:dump --current",
+                $this->getContainer()->get('kernel')->getRootDir()));
+            $output->writeln($path);
 
-        if (count($backupConfig["dumps"]) == 0) {
+            return;
+        }
+
+        $backups = BackupList::factory();
+        /**
+         * @var $backup Backup
+         */
+        $backup = $backups->getDumps()->get($id);
+
+        if (null == $backup) {
             $output->writeln(CommandHelper::writeError("Backup not found!"));
+            return;
         }
 
-        $dump = $backupConfig["dumps"][$id];
+        $toTmp = sprintf("/tmp/%s", md5(time()));
+        $fs = new \Symfony\Component\Filesystem\Filesystem();
+        $fs->mkdir($toTmp);
+        $backup->extractTo($toTmp);
 
-        $archiveName   = sprintf("%s.tar.gz", date("Y-m-d_H-i-s", $dump["timestamp"]));
-        $backupArchive = sprintf("%s/%s", $backupFolder, $archiveName);
-        $temp          = md5(time());
-        $tempArchive   = sprintf("/tmp/%s.tar.gz", $temp);
-        $tempExtract   = sprintf("/tmp/%s", $temp);
-
-        try {
-            /**
-             * @var $gfs \Gaufrette\Filesystem
-             */
-            $gfs  = $this->getContainer()
-                ->get('knp_gaufrette.filesystem_map')
-                ->get(self::$configs["backup_folder"]);
-            $data = $gfs->read($archiveName);
-
-            /**
-             * @var $fs Filesystem
-             */
-            $fs = new \Symfony\Component\Filesystem\Filesystem();
-            $fs->dumpFile($tempArchive, $data);
-        } catch (\InvalidArgumentException $exception) {
-            CommandHelper::executeCommand(sprintf("cp %s %s", $backupArchive, $tempArchive));
-        }
-
-        $cmd = sprintf("mkdir %s; tar xfz %s -C %s; rm %s",
-            $tempExtract,
-            $tempArchive,
-            $tempExtract,
-            $tempArchive
-        );
-
-        $output->writeln(CommandHelper::executeCommand($cmd));
-
-        $output->writeln($tempExtract);
+        $output->writeln($toTmp);
     }
 
     protected function getConfig()

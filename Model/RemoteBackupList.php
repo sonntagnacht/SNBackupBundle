@@ -13,24 +13,33 @@ namespace SN\BackupBundle\Model;
 
 
 
+use Doctrine\Common\Collections\ArrayCollection;
 use SN\ToolboxBundle\Helper\CommandHelper;
 
 class RemoteBackupList
 {
     protected $list;
 
-    public function __construct($env, array $envConfig)
+    public function __construct($env, array $envConfig, $type = null)
     {
+        $this->list = new ArrayCollection();
+
         $json_data = CommandHelper::executeRemoteCommand(sprintf("php bin/console sn:backup:get"), $envConfig[$env]);
         $json_data = json_decode($json_data, true);
-        foreach ($json_data["dumps"] as $k => $v) {
+        foreach ($json_data as $k => $v) {
+            if (isset($v["type"]) && $type != null && $type != $v["type"]) {
+                continue;
+            }
+
             $backup = new Backup();
-            $backup->setDateTime($v["timestamp"]);
+            $backup->setTimestamp($v["timestamp"]);
             $backup->setVersion($v["version"]);
             $backup->setCommit($v["commit"]);
-            $json_data["dumps"][$k] = $backup;
+            if (isset($v["type"])) {
+                $backup->setType($v["type"]);
+            }
+            $this->list->add($backup);
         }
-        $this->list = $json_data;
     }
 
     public function hasBackups()
@@ -39,10 +48,10 @@ class RemoteBackupList
     }
 
     /**
-     * @return array|Backup[]
+     * @return array|Backup[]|ArrayCollection
      */
     public function getDumps(){
-        return $this->list["dumps"];
+        return $this->list;
     }
 
     public function jsonSerialize()
