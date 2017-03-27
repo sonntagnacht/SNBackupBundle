@@ -34,6 +34,16 @@ Restore a saved snapshot
 Delete backups whiche are older than seven days.
 
     php bin/console sn:backup:cleanup [daily|weekly|monthly|yearly] 7d
+
+### Required SNDeployBundle
+
+Get a list of all remote snapshots
+
+    php bin/console sn:backup:restore --remote=[prod|test|dev]
+    
+Download current snapshot of your remote system
+
+    php bin/console sn:backup:restore --remote=[prod|test|dev] c
     
 ## WebGUI
 
