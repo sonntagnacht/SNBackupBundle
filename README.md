@@ -47,6 +47,8 @@ Download current snapshot of your remote system
     
 ## WebGUI
 
+![webgui](Resources/doc/web_gui.jpg)
+
 ```yaml
 SNBackupBundle:
     resource: "@SNBackupBundle/Controller/"
