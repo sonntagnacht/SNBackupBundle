@@ -205,7 +205,12 @@ class DumpCommand extends ContainerAwareCommand
     protected function dumpDatabase($dest)
     {
 
-        $con           = $this->getContainer()->get('doctrine.dbal.default_connection');
+        $dbal_string = sprintf('doctrine.dbal.%s_connection', Config::get(Config::DATABASES));
+        $con           = $this->getContainer()->get($dbal_string);
+        if(!$con->isConnected()){
+            throw new ConnectionException('Database is not connected!');
+        }
+
         $schemaManager = $con->getSchemaManager();
         $mngTables     = $schemaManager->listTables();
         $tables        = array();

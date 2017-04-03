@@ -18,7 +18,7 @@ class Config
 {
 
     const BACKUP_FOLDER = "backup_folder";
-    const DATABASE      = "database";
+    const DATABASES     = "database";
     const FILESYSTE     = "filesystem";
     const FILESYSTEM    = "filesystem";
 

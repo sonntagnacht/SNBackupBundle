@@ -18,10 +18,11 @@ class Configuration implements ConfigurationInterface
     public function getConfigTreeBuilder()
     {
         $treeBuilder = new TreeBuilder();
-        $rootNode = $treeBuilder->root('sn_backup');
+        $rootNode    = $treeBuilder->root('sn_backup');
 
         $rootNode->children()
             ->scalarNode('backup_folder')->end()
+            ->scalarNode('database')->end()
             ->end();
 
         // Here you should define the parameters that are allowed to
