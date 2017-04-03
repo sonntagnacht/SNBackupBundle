@@ -22,7 +22,7 @@ class Configuration implements ConfigurationInterface
 
         $rootNode->children()
             ->scalarNode('backup_folder')->end()
-            ->scalarNode('database')->end()
+            ->scalarNode('database')->defaultValue('default')->end()
             ->end();
 
         // Here you should define the parameters that are allowed to
