@@ -10,8 +10,10 @@
 
 namespace SN\BackupBundle\Command;
 
+use Doctrine\DBAL\ConnectionException;
 use SN\BackupBundle\Model\Backup;
 use SN\BackupBundle\Model\BackupList;
+use SN\BackupBundle\Model\Config;
 use SN\BackupBundle\Model\RemoteBackup;
 use SN\BackupBundle\Model\RemoteBackupList;
 use SN\ToolboxBundle\Helper\CommandHelper;
@@ -316,7 +318,12 @@ class RestoreCommand extends ContainerAwareCommand
         $json_string = file_get_contents($src);
         $database    = json_decode($json_string, true);
 
-        $con = $this->getContainer()->get('doctrine.dbal.default_connection');
+        $dbal_string = sprintf('doctrine.dbal.%s_connection', Config::get(Config::DATABASES));
+        $con           = $this->getContainer()->get($dbal_string);
+        if(!$con->isConnected()){
+            throw new ConnectionException('Database is not connected!');
+        }
+
         $con->exec('SET foreign_key_checks = 0');
         $schemaManager = $con->getSchemaManager();
         $mngTables     = $schemaManager->listTables();
