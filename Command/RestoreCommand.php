@@ -10,6 +10,7 @@
 
 namespace SN\BackupBundle\Command;
 
+use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\ConnectionException;
 use SN\BackupBundle\Model\Backup;
 use SN\BackupBundle\Model\BackupList;
@@ -319,8 +320,12 @@ class RestoreCommand extends ContainerAwareCommand
         $database    = json_decode($json_string, true);
 
         $dbal_string = sprintf('doctrine.dbal.%s_connection', Config::get(Config::DATABASES));
-        $con           = $this->getContainer()->get($dbal_string);
-        if(!$con->isConnected()){
+        /**
+         * @var $con Connection
+         */
+        $con = $this->getContainer()->get($dbal_string);
+
+        if (!$con->isConnected() && !$con->connect()) {
             throw new ConnectionException('Database is not connected!');
         }
 
@@ -336,10 +341,14 @@ class RestoreCommand extends ContainerAwareCommand
             $this->getContainer()->get('kernel')->getRootDir());
         CommandHelper::executeCommand($cmd);
 
+        $cmd = sprintf("php %s/../bin/console doctrine:migrations:status",
+            $this->getContainer()->get('kernel')->getRootDir());
+        CommandHelper::executeCommand($cmd);
+
         $tables = count($database);
 
         $progress = new ProgressBar($this->output, $tables);
-        $progress->setFormat(' %current%/%max% --- %message%');
+        $progress->setFormat(' %current%/%max% Tables --- %message%');
         $progress->start();
 
         foreach ($database as $tablename => $table) {
