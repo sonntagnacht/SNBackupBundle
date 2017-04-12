@@ -11,6 +11,8 @@
 namespace SN\BackupBundle\Command;
 
 
+use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\ConnectionException;
 use SN\BackupBundle\Model\Backup;
 use SN\BackupBundle\Model\BackupList;
 use SN\BackupBundle\Model\Config;
@@ -206,8 +208,11 @@ class DumpCommand extends ContainerAwareCommand
     {
 
         $dbal_string = sprintf('doctrine.dbal.%s_connection', Config::get(Config::DATABASES));
+        /**
+         * @var $con Connection
+         */
         $con           = $this->getContainer()->get($dbal_string);
-        if(!$con->isConnected()){
+        if(!$con->isConnected() && !$con->connect()){
             throw new ConnectionException('Database is not connected!');
         }
 
