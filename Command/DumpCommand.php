@@ -125,9 +125,9 @@ class DumpCommand extends ContainerAwareCommand
         $fs->mkdir($tempFolder);
 
         // Get configs
-        $backupFolder     = Config::get(Config::BACKUP_FOLDER);
+        $backupFolder = Config::get(Config::BACKUP_FOLDER);
 
-        $this->dumpDatabase(sprintf("%s/database.json", $tempFolder));
+        $this->dumpDatabase($tempFolder);
 
         $gaufrette = $this->getContainer()->get('knp_gaufrette.filesystem_map');
 
@@ -204,15 +204,38 @@ class DumpCommand extends ContainerAwareCommand
         BackupList::factory()->addBackup($backup);
     }
 
-    protected function dumpDatabase($dest)
+    protected function dumpDatabase($destination)
     {
 
         $dbal_string = sprintf('doctrine.dbal.%s_connection', Config::get(Config::DATABASES));
         /**
          * @var $con Connection
          */
-        $con           = $this->getContainer()->get($dbal_string);
-        if(!$con->isConnected() && !$con->connect()){
+        $con    = $this->getContainer()->get($dbal_string);
+        $driver = get_class($con->getDriver());
+
+        switch ($driver) {
+            case 'Doctrine\DBAL\Driver\PDOMySql\Driver':
+                if (CommandHelper::executeCommand("which mysqldump")) {
+                    $cmd = sprintf("mysqldump -h %s -u %s -P %s --password='%s' --compress %s > %s/database.sql",
+                        $con->getHost(),
+                        $con->getUsername(),
+                        $con->getPort() ? $con->getPort() : 3306,
+                        $con->getPassword(),
+                        $con->getDatabase(),
+                        $destination);
+                    CommandHelper::executeCommand($cmd, $this->output);
+                    return;
+                }
+                break;
+        }
+
+        // Default Database-Export
+        $warning = CommandHelper::writeWarning(sprintf("Databasedump command for [%s] not found. Try JSON export!",
+            $driver));
+        $this->output->writeln($warning);
+
+        if (!$con->isConnected() && !$con->connect()) {
             throw new ConnectionException('Database is not connected!');
         }
 
@@ -221,17 +244,17 @@ class DumpCommand extends ContainerAwareCommand
         $tables        = array();
 
         foreach ($mngTables as $table) {
-            $cols   = array();
-            $query    = sprintf("SELECT * FROM %s", $table->getName());
+            $cols      = array();
+            $query     = sprintf("SELECT * FROM %s", $table->getName());
             $statement = $con->executeQuery($query);
-            while ($result =  $statement->fetchAll() ) {
+            while ($result = $statement->fetchAll()) {
                 $cols[] = $result;
             }
             $tables[$table->getName()] = $cols;
         }
 
         $fs = new Filesystem();
-        $fs->dumpFile($dest, json_encode($tables));
+        $fs->dumpFile(sprintf("%s/database.json", $destination), json_encode($tables));
 
     }
 
