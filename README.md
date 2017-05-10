@@ -77,7 +77,3 @@ SNBackupBundle:
     type: annotation
     prefix: /backup
 ```
-
-test
-
-
