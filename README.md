@@ -4,6 +4,27 @@ This BackupBundle can create backups from type daily, weekly, monthly or yearly.
 
 ## Configuration
 
+Add to `AppKernel.php`
+
+```php
+class AppKernel extends Kernel
+{
+    public function registerBundles()
+    {
+        $bundles = array(
+            new Symfony\Bundle\FrameworkBundle\FrameworkBundle(),
+            new Symfony\Bundle\SecurityBundle\SecurityBundle(),
+            new Symfony\Bundle\TwigBundle\TwigBundle(),
+            // ...
+            new SN\BackupBundle\SNBackupBundle(),
+            // ...
+            
+        return $bundles;
+    }
+    // ...
+}
+```
+
 config.yml
 
 ```yaml
