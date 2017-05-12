@@ -314,23 +314,56 @@ class RestoreCommand extends ContainerAwareCommand
         $backup->render();
     }
 
-    protected function importDatabase($src)
+    protected function dropDatabase(Connection $connection) {
+        $connection->exec('SET foreign_key_checks = 0');
+        $schemaManager = $connection->getSchemaManager();
+        $mngTables     = $schemaManager->listTables();
+
+        foreach ($mngTables as $table) {
+            $schemaManager->dropTable($table->getName());
+        }
+    }
+
+    protected function importDatabase($source)
     {
-        $json_string = file_get_contents($src);
-        $database    = json_decode($json_string, true);
+        $fileParts = explode(".",$source);
+        $dbFileType = array_pop($fileParts);
 
         $dbal_string = sprintf('doctrine.dbal.%s_connection', Config::get(Config::DATABASES));
         /**
-         * @var $con Connection
+         * @var $connection Connection
          */
-        $con = $this->getContainer()->get($dbal_string);
+        $connection    = $this->getContainer()->get($dbal_string);
+        $driver = get_class($connection->getDriver());
 
-        if (!$con->isConnected() && !$con->connect()) {
+        if($dbFileType == "sql"){
+            switch ($driver) {
+                case 'Doctrine\DBAL\Driver\PDOMySql\Driver':
+                    if (CommandHelper::executeCommand("which mysql")) {
+                        $cmd = sprintf("mysql -h %s -u %s -P %s --password='%s' %s < %s",
+                            $connection->getHost(),
+                            $connection->getUsername(),
+                            $connection->getPort() ? $connection->getPort() : 3306,
+                            $connection->getPassword(),
+                            $connection->getDatabase(),
+                            $source);
+                        CommandHelper::executeCommand($cmd, $this->output);
+                        $connection->exec('SET foreign_key_checks = 0');
+                        return;
+                    }
+                    break;
+            }
+        }
+
+        $json_string = file_get_contents($source);
+        $database    = json_decode($json_string, true);
+
+        if (!$connection->isConnected() && !$connection->connect()) {
             throw new ConnectionException('Database is not connected!');
         }
 
-        $con->exec('SET foreign_key_checks = 0');
-        $schemaManager = $con->getSchemaManager();
+        $connection->exec('SET foreign_key_checks = 0');
+        $schemaManager = $connection->getSchemaManager();
         $mngTables     = $schemaManager->listTables();
 
         foreach ($mngTables as $table) {
@@ -363,13 +396,13 @@ class RestoreCommand extends ContainerAwareCommand
                             $values[] = sprintf("%s = \"%s\"", $key, addslashes($value));
                         }
                     }
-                    $con->exec(sprintf("INSERT INTO %s SET %s;", $tablename, join(',', $values)));
+                    $connection->exec(sprintf("INSERT INTO %s SET %s;", $tablename, join(',', $values)));
                 }
             }
             $progress->advance();
         }
         $progress->finish();
 
-        $con->exec('SET foreign_key_checks = 1');
+        $connection->exec('SET foreign_key_checks = 1');
     }
 }
