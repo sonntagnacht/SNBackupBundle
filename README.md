@@ -36,7 +36,8 @@ knp_gaufrette:
 
 sn_backup:
     backup_folder: backup_fs
-    database: mydb                  # name of your doctrine database connection (default: default)
+    databases: 
+        - mydb                  # name of your doctrine database connection (default: default)
 ```
 
 ## Usage
