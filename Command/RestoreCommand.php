@@ -14,7 +14,6 @@ use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\ConnectionException;
 use SN\BackupBundle\Model\Backup;
 use SN\BackupBundle\Model\BackupList;
-use SN\BackupBundle\Model\Config;
 use SN\BackupBundle\Model\RemoteBackup;
 use SN\BackupBundle\Model\RemoteBackupList;
 use SN\ToolboxBundle\Helper\CommandHelper;
@@ -30,6 +29,7 @@ use Symfony\Component\Console\Question\Question;
 use Symfony\Component\DependencyInjection\Exception\ServiceNotFoundException;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Finder\Finder;
+use Symfony\Component\Finder\SplFileInfo;
 
 class RestoreCommand extends ContainerAwareCommand
 {
@@ -233,8 +233,19 @@ class RestoreCommand extends ContainerAwareCommand
         }
 
         // Database import
-        $src = sprintf("%s/database.json", $extractFolder);
-        $this->importDatabase($src);
+        $finder = new Finder();
+        $finder->files()->in($extractFolder);
+
+        foreach ($finder->name('database.*') as $file) {
+            $this->importDatabase($file);
+        }
+
+        $finder = new Finder();
+        $finder->files()->in(sprintf("%s/databases", $extractFolder));
+        dump($finder);
+        foreach ($finder as $file) {
+            $this->importDatabase($file);
+        }
 
         try {
             $gaufrette = $this->getContainer()->get('knp_gaufrette.filesystem_map');
@@ -314,7 +325,8 @@ class RestoreCommand extends ContainerAwareCommand
         $backup->render();
     }
 
-    protected function dropDatabase(Connection $connection) {
+    protected function dropDatabase(Connection $connection)
+    {
         $connection->exec('SET foreign_key_checks = 0');
         $schemaManager = $connection->getSchemaManager();
         $mngTables     = $schemaManager->listTables();
@@ -324,19 +336,28 @@ class RestoreCommand extends ContainerAwareCommand
         }
     }
 
-    protected function importDatabase($source)
+    /**
+     * @param SplFileInfo $file
+     * @param bool $oldVersion
+     * @throws ConnectionException
+     */
+    protected function importDatabase(SplFileInfo $file, $oldVersion = false)
     {
-        $fileParts = explode(".",$source);
-        $dbFileType = array_pop($fileParts);
-
-        $dbal_string = sprintf('doctrine.dbal.%s_connection', Config::get(Config::DATABASES));
+        $name = array_shift(explode(".", $file->getFilename()));
+        if (true === $oldVersion) {
+            $dbal_string = sprintf('doctrine.dbal.%s_connection', Config::get(Config::DATABASES));
+        } else {
+            $dbal_string = sprintf('doctrine.dbal.%s_connection', $name);
+        }
         /**
          * @var $connection Connection
          */
-        $connection    = $this->getContainer()->get($dbal_string);
-        $driver = get_class($connection->getDriver());
+        $connection = $this->getContainer()->get($dbal_string);
+        $driver     = get_class($connection->getDriver());
 
-        if($dbFileType == "sql"){
+        $this->dropDatabase($connection);
+
+        if ($file->getExtension() == "sql") {
             switch ($driver) {
                 case 'Doctrine\DBAL\Driver\PDOMySql\Driver':
                     if (CommandHelper::executeCommand("which mysql")) {
@@ -346,16 +367,18 @@ class RestoreCommand extends ContainerAwareCommand
                             $connection->getPort() ? $connection->getPort() : 3306,
                             $connection->getPassword(),
                             $connection->getDatabase(),
-                            $source);
+                            $file->getRealPath());
                         CommandHelper::executeCommand($cmd, $this->output);
                         $connection->exec('SET foreign_key_checks = 0');
+
                         return;
                     }
+
                     break;
             }
         }
 
-        $json_string = file_get_contents($source);
+        $json_string = file_get_contents($file->getRealPath());
         $database    = json_decode($json_string, true);
 
         if (!$connection->isConnected() && !$connection->connect()) {

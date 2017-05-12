@@ -41,7 +41,7 @@ class Backup implements \JsonSerializable
         /**
          * @var $fs \Gaufrette\Filesystem
          */
-        $fs = Config::get(Config::FILESYSTE);
+        $fs = Config::get(Config::FILESYSTEM);
         $fs->delete($this->getAbsolutePath());
     }
 
@@ -65,7 +65,7 @@ class Backup implements \JsonSerializable
         /**
          * @var $fs \Gaufrette\Filesystem
          */
-        $fs = Config::get(Config::FILESYSTE);
+        $fs = Config::get(Config::FILESYSTEM);
 
         return $fs->has($this->getAbsolutePath());
     }
@@ -109,7 +109,7 @@ class Backup implements \JsonSerializable
         /**
          * @var $fs \Gaufrette\Filesystem
          */
-        $fs   = Config::get(Config::FILESYSTE);
+        $fs   = Config::get(Config::FILESYSTEM);
         $file = $fs->get($this->getAbsolutePath());
 
         if ($file->exists() === false) {
@@ -143,7 +143,7 @@ class Backup implements \JsonSerializable
         /**
          * @var $fs \Gaufrette\Filesystem
          */
-        $fs = Config::get(Config::FILESYSTE);
+        $fs = Config::get(Config::FILESYSTEM);
         $fs->write($this->getAbsolutePath(), file_get_contents($file->getRealPath()), true);
     }
 
@@ -165,7 +165,7 @@ class Backup implements \JsonSerializable
         /**
          * @var $gfs \Gaufrette\Filesystem
          */
-        $gfs = Config::get(Config::FILESYSTE);
+        $gfs = Config::get(Config::FILESYSTEM);
         $fs  = new Filesystem();
         $fs->dumpFile($tmpFile, $gfs->read($this->getAbsolutePath()));
 
@@ -189,7 +189,7 @@ class Backup implements \JsonSerializable
         /**
          * @var $gfs \Gaufrette\Filesystem
          */
-        $gfs = Config::get(Config::FILESYSTE);
+        $gfs = Config::get(Config::FILESYSTEM);
 
         $gfs->write($this->getAbsolutePath(), file_get_contents($tmpFile), true);
     }

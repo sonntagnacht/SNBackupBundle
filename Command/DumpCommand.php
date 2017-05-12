@@ -41,6 +41,13 @@ class DumpCommand extends ContainerAwareCommand
      */
     protected $output;
 
+    protected $tempFolder;
+
+    /**
+     * @var $fs Filesystem
+     */
+    protected $fs;
+
     protected function configure()
     {
         $backupTypeDescription = sprintf('The type of the backup [%s]',
@@ -87,6 +94,26 @@ class DumpCommand extends ContainerAwareCommand
         array_unshift(self::$buInformations["dumps"], self::$dump);
     }
 
+    /**
+     * @param $path
+     * @param bool $remove
+     * @return mixed
+     */
+    protected function createFolder($path, $remove = false)
+    {
+        $fs = $this->fs;
+
+        if (true === $remove) {
+            $fs->remove($path);
+        }
+
+        if (false === $fs->exists($path)) {
+            $fs->mkdir($path);
+        }
+
+        return $path;
+    }
+
     protected function execute(InputInterface $input, OutputInterface $output)
     {
         $this->input  = $input;
@@ -117,17 +144,23 @@ class DumpCommand extends ContainerAwareCommand
             return;
         }
 
-        $fs         = new Filesystem();
-        $tempFolder = sprintf("/tmp/sn_backup");
-
-        // prepare backup folder
-        $fs->remove($tempFolder);
-        $fs->mkdir($tempFolder);
 
         // Get configs
         $backupFolder = Config::get(Config::BACKUP_FOLDER);
+        $this->fs     = new Filesystem();
+        $fs           = $this->fs;
 
-        $this->dumpDatabase($tempFolder);
+        $this->tempFolder = $this->createFolder("/tmp/sn_backup", true);
+
+
+        $connections = Config::get(Config::DATABASES);
+        if (is_array($connections)) {
+            foreach ($connections as $connection_name) {
+                $this->dumpDatabase($connection_name);
+            }
+        } else {
+            $this->dumpDatabase($connections);
+        }
 
         $gaufrette = $this->getContainer()->get('knp_gaufrette.filesystem_map');
 
@@ -138,7 +171,7 @@ class DumpCommand extends ContainerAwareCommand
             }
 
             $fs->mkdir(sprintf("%s/%s",
-                $tempFolder,
+                $this->tempFolder,
                 $folder));
             /**
              * @var $gfs \Gaufrette\Filesystem
@@ -148,14 +181,14 @@ class DumpCommand extends ContainerAwareCommand
             foreach ($files as $file) {
                 if ($gfs->isDirectory($file)) {
                     $fs->mkdir(sprintf("%s/%s/%s",
-                        $tempFolder,
+                        $this->tempFolder,
                         $folder,
                         $file));
                 } else {
                     $data = $gfs->read($file);
                     $fs->dumpFile(
                         sprintf("%s/%s/%s",
-                            $tempFolder,
+                            $this->tempFolder,
                             $folder,
                             $file),
                         $data);
@@ -167,9 +200,9 @@ class DumpCommand extends ContainerAwareCommand
             $root_dir = $this->getContainer()->get('kernel')->getRootDir() . '/../';
 
             $cmd = sprintf("mkdir %s/_app; cp -r %s %s/_app",
-                $tempFolder,
+                $this->tempFolder,
                 $root_dir,
-                $tempFolder);
+                $this->tempFolder);
 
             $this->executeCommand($cmd);
         }
@@ -177,17 +210,17 @@ class DumpCommand extends ContainerAwareCommand
         if ($input->getOption('current')) {
 
             $currentFolder = sprintf("/tmp/%s", md5($backup->getTimestamp()));
-            $cmd           = sprintf("cp -r %s %s", $tempFolder, $currentFolder);
+            $cmd           = sprintf("cp -r %s %s", $this->tempFolder, $currentFolder);
 
             $this->executeCommand($cmd);
-            $fs->remove($tempFolder);
+            $fs->remove($this->tempFolder);
 
             $this->writeln($currentFolder, true);
 
             return;
         }
-        $backup->insertFrom($tempFolder);
-        $fs->remove($tempFolder);
+        $backup->insertFrom($this->tempFolder);
+        $fs->remove($this->tempFolder);
 
         try {
             /**
@@ -204,10 +237,12 @@ class DumpCommand extends ContainerAwareCommand
         BackupList::factory()->addBackup($backup);
     }
 
-    protected function dumpDatabase($destination)
+    protected function dumpDatabase($connection_name)
     {
+        $destination = sprintf("%s/databases", $this->tempFolder);
+        $this->createFolder($destination);
+        $dbal_string = sprintf('doctrine.dbal.%s_connection', $connection_name);
 
-        $dbal_string = sprintf('doctrine.dbal.%s_connection', Config::get(Config::DATABASES));
         /**
          * @var $con Connection
          */
@@ -217,14 +252,16 @@ class DumpCommand extends ContainerAwareCommand
         switch ($driver) {
             case 'Doctrine\DBAL\Driver\PDOMySql\Driver':
                 if (CommandHelper::executeCommand("which mysqldump")) {
-                    $cmd = sprintf("mysqldump --single-transaction=TRUE --quick -h %s -u %s -P %s --password='%s' --compress %s > %s/database.sql",
+                    $cmd = sprintf("mysqldump --single-transaction=TRUE --quick -h %s -u %s -P %s --password='%s' --compress %s > %s/%s.sql",
                         $con->getHost(),
                         $con->getUsername(),
                         $con->getPort() ? $con->getPort() : 3306,
                         $con->getPassword(),
                         $con->getDatabase(),
-                        $destination);
+                        $destination,
+                        $connection_name);
                     CommandHelper::executeCommand($cmd, $this->output);
+
                     return;
                 }
                 break;
@@ -253,8 +290,11 @@ class DumpCommand extends ContainerAwareCommand
             $tables[$table->getName()] = $cols;
         }
 
-        $fs = new Filesystem();
-        $fs->dumpFile(sprintf("%s/database.json", $destination), json_encode($tables));
+        $this->fs->dumpFile(sprintf(
+            "%s/%s.json",
+            $destination,
+            $connection_name),
+            json_encode($tables));
 
     }
 
