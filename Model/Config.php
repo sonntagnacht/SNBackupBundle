@@ -19,7 +19,6 @@ class Config
 
     const BACKUP_FOLDER = "backup_folder";
     const DATABASES     = "database";
-    const FILESYSTE     = "filesystem";
     const FILESYSTEM    = "filesystem";
 
     protected static $config = [];
@@ -34,11 +33,11 @@ class Config
     public static function isGaufrette(ContainerInterface $container)
     {
         try {
-            self::$config["filesystem"] = $container
+            self::$config[self::FILESYSTEM] = $container
                 ->get('knp_gaufrette.filesystem_map')
-                ->get(self::$config["backup_folder"]);
+                ->get(self::$config[self::BACKUP_FOLDER]);
         } catch (\InvalidArgumentException $exception) {
-            self::$config["filesystem"] = new Filesystem();
+            self::$config[self::FILESYSTEM] = new Filesystem();
         }
 
         return time();
@@ -52,4 +51,21 @@ class Config
 
         return null;
     }
+
+    public static function getBackupFolder()
+    {
+        return self::get(self::BACKUP_FOLDER);
+    }
+
+    public static function getFilesystem()
+    {
+        return self::get(self::FILESYSTEM);
+    }
+
+    public static function getDatabase()
+    {
+        return self::get(self::DATABASES);
+    }
+
+
 }
