@@ -18,7 +18,7 @@ class Config
 {
 
     const BACKUP_FOLDER = "backup_folder";
-    const DATABASES     = "database";
+    const DATABASES     = "databases";
     const FILESYSTEM    = "filesystem";
 
     protected static $config = [];

@@ -241,8 +241,7 @@ class RestoreCommand extends ContainerAwareCommand
         }
 
         $finder = new Finder();
-        $finder->files()->in(sprintf("%s/databases", $extractFolder));
-        dump($finder);
+        $finder->files()->in(sprintf("%s/_databases", $extractFolder));
         foreach ($finder as $file) {
             $this->importDatabase($file);
         }
@@ -265,7 +264,11 @@ class RestoreCommand extends ContainerAwareCommand
             // Load import Gaufrette files
             $finder->directories()->in("$extractFolder")->depth("== 0");
             foreach ($finder as $dir) {
-                if ($dir->getRelativePathname() == "_app") {
+                if (in_array($dir->getRelativePathname(),
+                    array(
+                        "_app",
+                        "_databases"
+                    ))) {
                     continue;
                 }
                 $gfs     = $gaufrette->get($dir->getRelativePathname());
@@ -343,7 +346,9 @@ class RestoreCommand extends ContainerAwareCommand
      */
     protected function importDatabase(SplFileInfo $file, $oldVersion = false)
     {
-        $name = array_shift(explode(".", $file->getFilename()));
+        $filename = explode(".", $file->getFilename());
+        $name     = array_shift($filename);
+
         if (true === $oldVersion) {
             $dbal_string = sprintf('doctrine.dbal.%s_connection', Config::get(Config::DATABASES));
         } else {

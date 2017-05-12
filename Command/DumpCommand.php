@@ -239,7 +239,7 @@ class DumpCommand extends ContainerAwareCommand
 
     protected function dumpDatabase($connection_name)
     {
-        $destination = sprintf("%s/databases", $this->tempFolder);
+        $destination = sprintf("%s/_databases", $this->tempFolder);
         $this->createFolder($destination);
         $dbal_string = sprintf('doctrine.dbal.%s_connection', $connection_name);
 
