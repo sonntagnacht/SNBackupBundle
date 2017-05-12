@@ -23,6 +23,7 @@ class Configuration implements ConfigurationInterface
         $rootNode->children()
             ->scalarNode('backup_folder')->end()
             ->arrayNode('databases')->prototype('scalar')->end()->end()
+            ->arrayNode('gaufrette_fs')->prototype('scalar')->end()->end()
             ->end();
 
         // Here you should define the parameters that are allowed to
