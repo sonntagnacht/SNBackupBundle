@@ -1,4 +1,5 @@
 <?php
+
 namespace SN\BackupBundle\Model;
 
 use Gaufrette\File;
@@ -86,8 +87,8 @@ class Backup implements \JsonSerializable
      */
     public function getFilesize($decimals = 2)
     {
-        $bytes = $this->getFile()->getSize();
-        $size = array(
+        $bytes  = $this->getFile()->getSize();
+        $size   = array(
             "Bytes",
             "kB",
             "MB",
@@ -179,11 +180,12 @@ class Backup implements \JsonSerializable
         $fs->remove($tmpFile);
     }
 
-    public function insertFrom($srcFolder)
+    public function insertFrom($srcFolder, $output = null)
     {
         $tmpFile = sprintf("/tmp/%s.tar.gz", md5(time()));
 
         $cmd = sprintf("cd %s; tar -czf %s *", $srcFolder, $tmpFile);
+//        CommandHelper::executeCommand($cmd, $output, false, "Compress Backup");
         CommandHelper::executeCommand($cmd);
 
         /**

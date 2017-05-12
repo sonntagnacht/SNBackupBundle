@@ -19,6 +19,7 @@ use SN\BackupBundle\Model\Config;
 use SN\DeployBundle\Services\Version;
 use SN\ToolboxBundle\Helper\CommandHelper;
 use Symfony\Bundle\FrameworkBundle\Command\ContainerAwareCommand;
+use Symfony\Component\Console\Helper\ProgressBar;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -116,6 +117,8 @@ class DumpCommand extends ContainerAwareCommand
 
     protected function execute(InputInterface $input, OutputInterface $output)
     {
+
+
         $this->input  = $input;
         $this->output = $output;
 
@@ -129,6 +132,18 @@ class DumpCommand extends ContainerAwareCommand
         ) {
             throw new \InvalidArgumentException(sprintf('The type [%s] is unknown.',
                 $this->input->getArgument('type')));
+        }
+
+        $gaufrette   = $this->getContainer()->get('knp_gaufrette.filesystem_map');
+        $gaufretteFs = Config::getGaufretteFs();
+        $saveFs      = array();
+
+        // test if backup fs exists
+        $gaufrette->get(Config::getTargetFs());
+
+        foreach ($gaufretteFs as $fsName) {
+            // if given fsName doesnt exist, an InvalidArgumentException will be thrown
+            $saveFs[$fsName] = $gaufrette->get($fsName);
         }
 
 
@@ -146,29 +161,72 @@ class DumpCommand extends ContainerAwareCommand
 
 
         // Get configs
-        $backupFolder = Config::get(Config::BACKUP_FOLDER);
-        $this->fs     = new Filesystem();
-        $fs           = $this->fs;
+        $this->fs = new Filesystem();
+        $fs       = $this->fs;
 
         $this->tempFolder = $this->createFolder("/tmp/sn_backup", true);
 
 
         $connections = Config::get(Config::DATABASES);
-        if (is_array($connections)) {
-            foreach ($connections as $connection_name) {
-                $this->dumpDatabase($connection_name);
-            }
-        } else {
-            $this->dumpDatabase($connections);
+        foreach ($connections as $connection_name) {
+            $this->dumpDatabase($connection_name);
         }
 
-        $gaufrette = $this->getContainer()->get('knp_gaufrette.filesystem_map');
+        $this->copyGaufretteFilesystem($saveFs);
+
+        if ($input->getOption('full')) {
+            $root_dir = $this->getContainer()->get('kernel')->getRootDir() . '/../';
+
+            $cmd = sprintf("mkdir %s/_app; cp -r %s %s/_app",
+                $this->tempFolder,
+                $root_dir,
+                $this->tempFolder);
+
+            $this->executeCommand($cmd);
+        }
+
+        if ($input->getOption('current')) {
+
+            $currentFolder = sprintf("/tmp/%s", md5($backup->getTimestamp()));
+            $cmd           = sprintf("cp -r %s %s", $this->tempFolder, $currentFolder);
+
+            $this->executeCommand($cmd);
+            $fs->remove($this->tempFolder);
+
+            $this->writeln($currentFolder, true);
+
+            return;
+        }
 
 
-        foreach ($gaufrette as $folder => $gfs) {
-            if ($folder == $backupFolder) {
-                continue;
-            }
+        $backup->insertFrom($this->tempFolder, $output);
+        $fs->remove($this->tempFolder);
+
+        try {
+            /**
+             * @var $sn_deploy Version
+             */
+            $sn_deploy = $this->getContainer()->get('sn_deploy.twig');
+            $backup->setCommit($sn_deploy->getCommit(false));
+            $backup->setVersion($sn_deploy->getVersion());
+        } catch (ServiceNotFoundException $exception) {
+            $backup->setCommit(null);
+            $backup->setVersion(null);
+        }
+
+        BackupList::factory()->addBackup($backup);
+    }
+
+    protected function copyGaufretteFilesystem($gaufretteFs)
+    {
+        $fs       = $this->fs;
+        $progress = new ProgressBar($this->output, count($gaufretteFs));
+        $progress->setFormat(' %current%/%max% Filesystems --- %message%');
+        $progress->start();
+        $progress->setMessage(sprintf("Searching"));
+
+        foreach ($gaufretteFs as $folder => $gfs) {
+            $progress->setMessage(sprintf("Copy [%s]", $folder));
 
             $fs->mkdir(sprintf("%s/%s",
                 $this->tempFolder,
@@ -194,47 +252,11 @@ class DumpCommand extends ContainerAwareCommand
                         $data);
                 }
             }
+            $progress->advance();
         }
 
-        if ($input->getOption('full')) {
-            $root_dir = $this->getContainer()->get('kernel')->getRootDir() . '/../';
-
-            $cmd = sprintf("mkdir %s/_app; cp -r %s %s/_app",
-                $this->tempFolder,
-                $root_dir,
-                $this->tempFolder);
-
-            $this->executeCommand($cmd);
-        }
-
-        if ($input->getOption('current')) {
-
-            $currentFolder = sprintf("/tmp/%s", md5($backup->getTimestamp()));
-            $cmd           = sprintf("cp -r %s %s", $this->tempFolder, $currentFolder);
-
-            $this->executeCommand($cmd);
-            $fs->remove($this->tempFolder);
-
-            $this->writeln($currentFolder, true);
-
-            return;
-        }
-        $backup->insertFrom($this->tempFolder);
-        $fs->remove($this->tempFolder);
-
-        try {
-            /**
-             * @var $sn_deploy Version
-             */
-            $sn_deploy = $this->getContainer()->get('sn_deploy.twig');
-            $backup->setCommit($sn_deploy->getCommit(false));
-            $backup->setVersion($sn_deploy->getVersion());
-        } catch (ServiceNotFoundException $exception) {
-            $backup->setCommit(null);
-            $backup->setVersion(null);
-        }
-
-        BackupList::factory()->addBackup($backup);
+        $progress->finish();
+        $this->output->writeln('');
     }
 
     protected function dumpDatabase($connection_name)

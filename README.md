@@ -35,10 +35,10 @@ knp_gaufrette:
             adapter: ...
 
 sn_backup:
-    backup_folder: backup_fs
+    target_fs: backup_fs
     databases: 
         - mydb                  # name of your doctrine database connection
-    gaufrette_fs:
+    include_fs:
         - image_fs              # names of gaufrette filesystems wich should backuped
 ```
 

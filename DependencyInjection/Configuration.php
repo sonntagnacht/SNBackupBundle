@@ -21,9 +21,9 @@ class Configuration implements ConfigurationInterface
         $rootNode    = $treeBuilder->root('sn_backup');
 
         $rootNode->children()
-            ->scalarNode('backup_folder')->end()
+            ->scalarNode('target_fs')->end()
             ->arrayNode('databases')->prototype('scalar')->end()->end()
-            ->arrayNode('gaufrette_fs')->prototype('scalar')->end()->end()
+            ->arrayNode('include_fs')->prototype('scalar')->end()->end()
             ->end();
 
         // Here you should define the parameters that are allowed to

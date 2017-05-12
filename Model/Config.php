@@ -17,9 +17,10 @@ use Symfony\Component\Filesystem\Filesystem;
 class Config
 {
 
-    const BACKUP_FOLDER = "backup_folder";
-    const DATABASES     = "databases";
-    const FILESYSTEM    = "filesystem";
+    const TARGET_FS  = "target_fs";
+    const DATABASES  = "databases";
+    const FILESYSTEM = "filesystem";
+    const INCLUDE_FS = "include_fs";
 
     protected static $config = [];
 
@@ -35,7 +36,7 @@ class Config
         try {
             self::$config[self::FILESYSTEM] = $container
                 ->get('knp_gaufrette.filesystem_map')
-                ->get(self::$config[self::BACKUP_FOLDER]);
+                ->get(self::$config[self::TARGET_FS]);
         } catch (\InvalidArgumentException $exception) {
             self::$config[self::FILESYSTEM] = new Filesystem();
         }
@@ -52,9 +53,9 @@ class Config
         return null;
     }
 
-    public static function getBackupFolder()
+    public static function getTargetFs()
     {
-        return self::get(self::BACKUP_FOLDER);
+        return self::get(self::TARGET_FS);
     }
 
     public static function getFilesystem()
@@ -65,6 +66,11 @@ class Config
     public static function getDatabase()
     {
         return self::get(self::DATABASES);
+    }
+
+    public static function getGaufretteFs()
+    {
+        return self::get(self::INCLUDE_FS);
     }
 
 
