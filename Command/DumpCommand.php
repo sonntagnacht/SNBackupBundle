@@ -252,7 +252,7 @@ class DumpCommand extends ContainerAwareCommand
         switch ($driver) {
             case 'Doctrine\DBAL\Driver\PDOMySql\Driver':
                 if (CommandHelper::executeCommand("which mysqldump")) {
-                    $cmd = sprintf("mysqldump --single-transaction=TRUE --quick -h %s -u %s -P %s --password='%s' --compress %s > %s/%s.sql",
+                    $cmd = sprintf("mysqldump --single-transaction=TRUE --quick -h %s -u %s -P %s --password='%s' %s > %s/%s.sql",
                         $con->getHost(),
                         $con->getUsername(),
                         $con->getPort() ? $con->getPort() : 3306,
