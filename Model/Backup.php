@@ -43,6 +43,7 @@ class Backup implements \JsonSerializable
          * @var $fs \Gaufrette\Filesystem
          */
         $fs = Config::get(Config::FILESYSTEM);
+        dump($this->getAbsolutePath());
         $fs->delete($this->getAbsolutePath());
     }
 
@@ -169,6 +170,11 @@ class Backup implements \JsonSerializable
         $gfs = Config::get(Config::FILESYSTEM);
         $fs  = new Filesystem();
         $fs->dumpFile($tmpFile, $gfs->read($this->getAbsolutePath()));
+        try {
+            $fs->remove($dstFolder);
+        } catch (\Exception $e) {
+        }
+        $fs->mkdir($dstFolder);
 
         $cmd = sprintf("tar xfz %s -C %s; rm -rf %s",
             $tmpFile,

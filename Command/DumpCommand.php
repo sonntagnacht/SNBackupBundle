@@ -217,6 +217,9 @@ class DumpCommand extends ContainerAwareCommand
         BackupList::factory()->addBackup($backup);
     }
 
+    /**
+     * @param $gaufretteFs \Gaufrette\Filesystem[]
+     */
     protected function copyGaufretteFilesystem($gaufretteFs)
     {
         $fs       = $this->fs;
@@ -224,9 +227,11 @@ class DumpCommand extends ContainerAwareCommand
         $progress->setFormat(' %current%/%max% Filesystems --- %message%');
         $progress->start();
         $progress->setMessage(sprintf("Searching"));
+        $progress->display();
 
         foreach ($gaufretteFs as $folder => $gfs) {
             $progress->setMessage(sprintf("Copy [%s]", $folder));
+            $progress->display();
 
             $fs->mkdir(sprintf("%s/%s",
                 $this->tempFolder,
@@ -254,9 +259,8 @@ class DumpCommand extends ContainerAwareCommand
             }
             $progress->advance();
         }
-
+        $progress->setMessage(sprintf("Finish"));
         $progress->finish();
-        $this->output->writeln('');
     }
 
     protected function dumpDatabase($connection_name)

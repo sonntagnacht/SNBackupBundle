@@ -26,7 +26,6 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Question\ConfirmationQuestion;
 use Symfony\Component\Console\Question\Question;
-use Symfony\Component\DependencyInjection\Exception\ServiceNotFoundException;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Finder\Finder;
 use Symfony\Component\Finder\SplFileInfo;
@@ -164,15 +163,27 @@ class RestoreCommand extends ContainerAwareCommand
             true);
     }
 
+    /**
+     * @param SplFileInfo $folder
+     */
+    protected function importGaufretteFilesystem(SplFileInfo $folder)
+    {
+        $finder = new Finder();
+        $finder->files()->in($folder->getRealPath());
+        $gfs = $this->getContainer()->get('knp_gaufrette.filesystem_map')->get($folder->getRelativePathname());
+
+        foreach ($finder as $file) {
+            $pathname = $file->getRelativePathname();
+            $content  = $file->getContents();
+            $gfs->write($pathname, $content, true);
+        }
+    }
+
     protected function restoreBackup($id, OutputInterface $output, InputInterface $input)
     {
         $extractFolder = sprintf("%s/../var/sn_backup", $this->getContainer()->get('kernel')->getRootDir());
         $fs            = new Filesystem();
-        try {
-            $fs->remove($extractFolder);
-        } catch (\Exception $e) {
-        }
-        $fs->mkdir($extractFolder);
+
 
         if ($input->getOption('remote') == null) {
             $backupList = BackupList::factory();
@@ -236,7 +247,7 @@ class RestoreCommand extends ContainerAwareCommand
         $finder = new Finder();
         $finder->files()->in($extractFolder);
 
-        foreach ($finder->name('database.*') as $file) {
+        foreach ($finder->name('database.*')->depth('== 0') as $file) {
             $this->importDatabase($file);
         }
 
@@ -246,42 +257,11 @@ class RestoreCommand extends ContainerAwareCommand
             $this->importDatabase($file);
         }
 
-        try {
-            $gaufrette = $this->getContainer()->get('knp_gaufrette.filesystem_map');
-            $finder    = new Finder();
-
-            // Delete all Gaufrette files
-            foreach ($gaufrette as $folder => $gfs) {
-                if ($folder == self::$configs["backup_folder"]) {
-                    continue;
-                }
-                $files = array_reverse($gfs->keys());
-                foreach ($files as $file) {
-                    $gfs->delete($file);
-                }
-            }
-
-            // Load import Gaufrette files
-            $finder->directories()->in("$extractFolder")->depth("== 0");
-            foreach ($finder as $dir) {
-                if (in_array($dir->getRelativePathname(),
-                    array(
-                        "_app",
-                        "_databases"
-                    ))) {
-                    continue;
-                }
-                $gfs     = $gaufrette->get($dir->getRelativePathname());
-                $dFinder = Finder::create();
-                $dFinder->files()->in($dir->getRealPath());
-                foreach ($dFinder as $file) {
-                    $pathname = $file->getRelativePathname();
-                    $content  = $file->getContents();
-                    $gfs->write($pathname, $content, true);
-                }
-            }
-
-        } catch (ServiceNotFoundException $exception) {
+        // Gaufrette Filesystem
+        $finder = new Finder();
+        $finder->in($extractFolder)->exclude(["_databases", "_app"])->depth('== 0');
+        foreach ($finder as $folder) {
+            $this->importGaufretteFilesystem($folder);
         }
 
         $fs->remove($extractFolder);
