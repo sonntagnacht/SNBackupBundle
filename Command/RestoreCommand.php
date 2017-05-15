@@ -172,6 +172,10 @@ class RestoreCommand extends ContainerAwareCommand
         $finder->files()->in($folder->getRealPath());
         $gfs = $this->getContainer()->get('knp_gaufrette.filesystem_map')->get($folder->getRelativePathname());
 
+        foreach (array_reverse($gfs->keys()) as $file) {
+            $gfs->delete($file);
+        }
+
         foreach ($finder as $file) {
             $pathname = $file->getRelativePathname();
             $content  = $file->getContents();
