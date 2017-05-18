@@ -319,7 +319,7 @@ class RestoreCommand extends ContainerAwareCommand
         $mngTables     = $schemaManager->listTables();
 
         foreach ($mngTables as $table) {
-            $schemaManager->dropTable($table->getName());
+            $schemaManager->dropTable(sprintf("`%s`", $table->getName()));
         }
     }
 

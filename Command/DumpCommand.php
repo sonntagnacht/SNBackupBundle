@@ -17,7 +17,9 @@ use SN\BackupBundle\Model\Backup;
 use SN\BackupBundle\Model\BackupList;
 use SN\BackupBundle\Model\Config;
 use SN\DeployBundle\Services\Version;
+use SN\ToolboxBundle\Gaufrette\GaufretteHelper;
 use SN\ToolboxBundle\Helper\CommandHelper;
+use SN\ToolboxBundle\Helper\DatavalueHelper;
 use Symfony\Bundle\FrameworkBundle\Command\ContainerAwareCommand;
 use Symfony\Component\Console\Helper\ProgressBar;
 use Symfony\Component\Console\Input\InputArgument;
@@ -230,7 +232,11 @@ class DumpCommand extends ContainerAwareCommand
         $progress->display();
 
         foreach ($gaufretteFs as $folder => $gfs) {
-            $progress->setMessage(sprintf("Copy [%s]", $folder));
+            $progress->advance();
+
+            $progress->setMessage(sprintf("Copy [%s] (%s)",
+                $folder,
+                DatavalueHelper::convertFilesize(GaufretteHelper::getSize($gfs))));
             $progress->display();
 
             $fs->mkdir(sprintf("%s/%s",
@@ -240,11 +246,13 @@ class DumpCommand extends ContainerAwareCommand
              * @var $gfs \Gaufrette\Filesystem
              */
             $files = $gfs->keys();
-
+            $this->output->writeln('');
             $subprogress = new ProgressBar($this->output, count($files));
+            $subprogress->setFormat('normal');
             $subprogress->start();
+            $subprogress->setRedrawFrequency(count($files) / 100);
 
-            foreach ($files as $file) {
+            foreach ($files as $counter => $file) {
                 if ($gfs->isDirectory($file)) {
                     $fs->mkdir(sprintf("%s/%s/%s",
                         $this->tempFolder,
@@ -262,8 +270,9 @@ class DumpCommand extends ContainerAwareCommand
                 $subprogress->advance();
             }
             $subprogress->finish();
-            CommandHelper::clearLineAfterCountdown($this->output);
-            $progress->advance();
+            $this->output->write("\x0D");
+            $this->output->write("\x1B[2K");
+
         }
         $progress->finish();
         $this->output->writeln(" - Complete!");
