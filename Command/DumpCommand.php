@@ -241,6 +241,9 @@ class DumpCommand extends ContainerAwareCommand
              */
             $files = $gfs->keys();
 
+            $subprogress = new ProgressBar($this->output, count($files));
+            $subprogress->start();
+
             foreach ($files as $file) {
                 if ($gfs->isDirectory($file)) {
                     $fs->mkdir(sprintf("%s/%s/%s",
@@ -256,7 +259,10 @@ class DumpCommand extends ContainerAwareCommand
                             $file),
                         $data);
                 }
+                $subprogress->advance();
             }
+            $subprogress->finish();
+            CommandHelper::clearLineAfterCountdown($this->output);
             $progress->advance();
         }
         $progress->finish();
