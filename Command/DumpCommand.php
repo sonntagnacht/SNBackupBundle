@@ -19,7 +19,7 @@ use SN\BackupBundle\Model\Config;
 use SN\DeployBundle\Services\Version;
 use SN\ToolboxBundle\Gaufrette\GaufretteHelper;
 use SN\ToolboxBundle\Helper\CommandHelper;
-use SN\ToolboxBundle\Helper\DatavalueHelper;
+use SN\ToolboxBundle\Helper\DataValueHelper;
 use Symfony\Bundle\FrameworkBundle\Command\ContainerAwareCommand;
 use Symfony\Component\Console\Helper\ProgressBar;
 use Symfony\Component\Console\Input\InputArgument;
@@ -236,7 +236,7 @@ class DumpCommand extends ContainerAwareCommand
 
             $progress->setMessage(sprintf("Copy [%s] (%s)",
                 $folder,
-                DatavalueHelper::convertFilesize(GaufretteHelper::getSize($gfs))));
+                DataValueHelper::convertFilesize(GaufretteHelper::getSize($gfs))));
             $progress->display();
 
             $fs->mkdir(sprintf("%s/%s",
