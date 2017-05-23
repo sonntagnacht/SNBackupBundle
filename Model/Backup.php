@@ -4,6 +4,7 @@ namespace SN\BackupBundle\Model;
 
 use Gaufrette\File;
 use SN\ToolboxBundle\Helper\CommandHelper;
+use SN\ToolboxBundle\Helper\DataValueHelper;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Filesystem\Filesystem;
 
@@ -43,7 +44,7 @@ class Backup implements \JsonSerializable
         /**
          * @var $fs \Gaufrette\Filesystem
          */
-        $fs = Config::get(Config::FILESYSTEM);
+        $fs = Config::getTargetFs();
         dump($this->getAbsolutePath());
         $fs->delete($this->getAbsolutePath());
     }
@@ -68,7 +69,7 @@ class Backup implements \JsonSerializable
         /**
          * @var $fs \Gaufrette\Filesystem
          */
-        $fs = Config::get(Config::FILESYSTEM);
+        $fs = Config::getTargetFs();
 
         return $fs->has($this->getAbsolutePath());
     }
@@ -112,7 +113,7 @@ class Backup implements \JsonSerializable
         /**
          * @var $fs \Gaufrette\Filesystem
          */
-        $fs   = Config::get(Config::FILESYSTEM);
+        $fs   = Config::getTargetFs();
         $file = $fs->get($this->getAbsolutePath());
 
         if ($file->exists() === false) {
@@ -146,7 +147,7 @@ class Backup implements \JsonSerializable
         /**
          * @var $fs \Gaufrette\Filesystem
          */
-        $fs = Config::get(Config::FILESYSTEM);
+        $fs = Config::getTargetFs();
         $fs->write($this->getAbsolutePath(), file_get_contents($file->getRealPath()), true);
     }
 
@@ -168,7 +169,7 @@ class Backup implements \JsonSerializable
         /**
          * @var $gfs \Gaufrette\Filesystem
          */
-        $gfs = Config::get(Config::FILESYSTEM);
+        $gfs = Config::getTargetFs();
         $fs  = new Filesystem();
         $fs->dumpFile($tmpFile, $gfs->read($this->getAbsolutePath()));
         try {
@@ -192,15 +193,20 @@ class Backup implements \JsonSerializable
         /**
          * @var $gfs \Gaufrette\Filesystem
          */
-        $gfs     = Config::get(Config::FILESYSTEM);
         $tmpFile = sprintf("/tmp/%s.tar.gz", md5(time()));
         $cmd     = sprintf("cd %s; tar -czf %s *", $srcFolder, $tmpFile);
 
         if ($output instanceof OutputInterface) {
             CommandHelper::executeCommand($cmd, $output, false, sprintf("Compressing Backup to [%s]", $tmpFile));
-            $output->writeln(sprintf('Uploading Backup to [%s]', $this->getAbsolutePath()));
+            $output->writeln(
+                sprintf('Uploading Backup (%s) to [%s]',
+                    DataValueHelper::convertFilesize(filesize($tmpFile)),
+                    $this->getAbsolutePath()
+                )
+            );
         }
 
+        $gfs = Config::getTargetFs();
         $gfs->write($this->getAbsolutePath(), file_get_contents($tmpFile), true);
 
         $fs = new Filesystem();

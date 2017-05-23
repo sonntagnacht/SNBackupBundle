@@ -85,8 +85,7 @@ class BackupList implements \JsonSerializable
         /**
          * @var $fs \Gaufrette\Filesystem
          */
-        $fs = Config::get(Config::FILESYSTEM);
-
+        $fs = Config::getTargetFs();
 
         if ($fs->has($this->getFilename()) === false) {
             return false;
@@ -100,8 +99,8 @@ class BackupList implements \JsonSerializable
         /**
          * @var $fs \Gaufrette\Filesystem
          */
-        $fs = Config::get(Config::FILESYSTEM);
-        $fs->write($this->getFilename(), (string)$this, true);
+        $fs = Config::getTargetFs();
+        $fs->write($this->getFilename(), (string) $this, true);
     }
 
     public function addBackup(Backup $backup)

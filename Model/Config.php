@@ -11,6 +11,7 @@
 namespace SN\BackupBundle\Model;
 
 
+use Knp\Bundle\GaufretteBundle\FilesystemMap;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\Filesystem\Filesystem;
 
@@ -24,24 +25,19 @@ class Config
 
     protected static $config = [];
 
-    public static function setConfig(array $config)
+    /**
+     * @var FilesystemMap
+     */
+    protected static $filesystemMap;
+
+    /**
+     * @param array $config
+     * @param FilesystemMap $filesystemMap
+     */
+    public static function setConfig(array $config, FilesystemMap $filesystemMap)
     {
-        self::$config = $config;
-
-        return time();
-    }
-
-    public static function isGaufrette(ContainerInterface $container)
-    {
-        try {
-            self::$config[self::FILESYSTEM] = $container
-                ->get('knp_gaufrette.filesystem_map')
-                ->get(self::$config[self::TARGET_FS]);
-        } catch (\InvalidArgumentException $exception) {
-            self::$config[self::FILESYSTEM] = new Filesystem();
-        }
-
-        return time();
+        self::$config        = $config;
+        self::$filesystemMap = $filesystemMap;
     }
 
     public static function get($key)
@@ -49,13 +45,14 @@ class Config
         if (array_key_exists($key, self::$config)) {
             return self::$config[$key];
         }
-
-        return null;
     }
 
+    /**
+     * @return \Gaufrette\Filesystem
+     */
     public static function getTargetFs()
     {
-        return self::get(self::TARGET_FS);
+        return self::$filesystemMap->get(self::$config[self::TARGET_FS]);
     }
 
     public static function getFilesystem()

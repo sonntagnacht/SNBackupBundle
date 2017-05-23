@@ -141,7 +141,7 @@ class DumpCommand extends ContainerAwareCommand
         $saveFs      = array();
 
         // test if backup fs exists
-        $gaufrette->get(Config::getTargetFs());
+        Config::getTargetFs();
 
         foreach ($gaufretteFs as $fsName) {
             // if given fsName doesnt exist, an InvalidArgumentException will be thrown

@@ -9,7 +9,9 @@ class SNBackupBundle extends Bundle
 {
     public function boot()
     {
-        Config::setConfig($this->container->getParameter('sn_backup'));
-        Config::isGaufrette($this->container);
+        Config::setConfig(
+            $this->container->getParameter('sn_backup'),
+            $this->container->get('knp_gaufrette.filesystem_map')
+        );
     }
 }
