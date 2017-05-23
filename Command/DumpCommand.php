@@ -200,7 +200,6 @@ class DumpCommand extends ContainerAwareCommand
             return;
         }
 
-        $output->writeln("Backup is compressed and uploaded. Please wait...");
         $backup->insertFrom($this->tempFolder, $output);
         $fs->remove($this->tempFolder);
 

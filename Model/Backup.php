@@ -4,6 +4,7 @@ namespace SN\BackupBundle\Model;
 
 use Gaufrette\File;
 use SN\ToolboxBundle\Helper\CommandHelper;
+use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Filesystem\Filesystem;
 
 /**
@@ -25,7 +26,7 @@ class Backup implements \JsonSerializable
 
     protected $filename = null;
     protected $version;
-    protected $type = null;
+    protected $type     = null;
     /**
      * @var \DateTime
      */
@@ -186,20 +187,24 @@ class Backup implements \JsonSerializable
         $fs->remove($tmpFile);
     }
 
-    public function insertFrom($srcFolder, $output = null)
+    public function insertFrom($srcFolder, OutputInterface $output = null)
     {
-        $tmpFile = sprintf("/tmp/%s.tar.gz", md5(time()));
-
-        $cmd = sprintf("cd %s; tar -czf %s *", $srcFolder, $tmpFile);
-//        CommandHelper::executeCommand($cmd, $output, false, "Compress Backup");
-        CommandHelper::executeCommand($cmd);
-
         /**
          * @var $gfs \Gaufrette\Filesystem
          */
-        $gfs = Config::get(Config::FILESYSTEM);
+        $gfs     = Config::get(Config::FILESYSTEM);
+        $tmpFile = sprintf("/tmp/%s.tar.gz", md5(time()));
+        $cmd     = sprintf("cd %s; tar -czf %s *", $srcFolder, $tmpFile);
+
+        if ($output instanceof OutputInterface) {
+            CommandHelper::executeCommand($cmd, $output, false, sprintf("Compressing Backup to [%s]", $tmpFile));
+            $output->writeln(sprintf('Uploading Backup to [%s]', $this->getAbsolutePath()));
+        }
 
         $gfs->write($this->getAbsolutePath(), file_get_contents($tmpFile), true);
+
+        $fs = new Filesystem();
+        $fs->remove($tmpFile);
     }
 
     /**
