@@ -162,7 +162,7 @@ class Backup implements \JsonSerializable
     /**
      * @param string $dstFolder
      */
-    public function extractTo($dstFolder)
+    public function extractTo($dstFolder, OutputInterface $output = null)
     {
         $tmpFile = sprintf("/tmp/%s.tar.gz", md5(time()));
 
@@ -171,6 +171,9 @@ class Backup implements \JsonSerializable
          */
         $gfs = Config::getTargetFs();
         $fs  = new Filesystem();
+        if ($output instanceof OutputInterface) {
+            $output->writeln(sprintf("Downloading Backup (%s) to [%s]", $this->getAbsolutePath(), $dstFolder));
+        }
         $fs->dumpFile($tmpFile, $gfs->read($this->getAbsolutePath()));
         try {
             $fs->remove($dstFolder);
@@ -183,7 +186,12 @@ class Backup implements \JsonSerializable
             $dstFolder,
             $tmpFile
         );
-        CommandHelper::executeCommand($cmd);
+
+        if ($output instanceof OutputInterface) {
+            CommandHelper::executeCommand($cmd, $output);
+        } else {
+            CommandHelper::executeCommand($cmd);
+        }
 
         $fs->remove($tmpFile);
     }
@@ -204,6 +212,8 @@ class Backup implements \JsonSerializable
                     $this->getAbsolutePath()
                 )
             );
+        } else {
+            CommandHelper::executeCommand($cmd);
         }
 
         $gfs = Config::getTargetFs();

@@ -204,7 +204,7 @@ class RestoreCommand extends ContainerAwareCommand
 
             return;
         }
-        $backup->extractTo($extractFolder);
+        $backup->extractTo($extractFolder, $output);
         $app_folder = sprintf("%s/_app", $extractFolder);
 
         if ($fs->exists($app_folder)) {
