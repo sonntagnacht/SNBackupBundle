@@ -209,11 +209,14 @@ class DumpCommand extends ContainerAwareCommand
         $progress = new ProgressBar($this->output, count($gaufretteFs));
         $progress->setFormat(' %current%/%max% Filesystems --- %message%');
         $progress->start();
-        $progress->setMessage(sprintf("Searching"));
-        $progress->display();
 
         foreach ($gaufretteFs as $folder => $gfs) {
             $progress->advance();
+
+            $progress->setMessage(sprintf("Calculate [%s]",
+                $folder));
+            $progress->display();
+
 
             $progress->setMessage(sprintf("Copy [%s] (%s)",
                 $folder,
@@ -227,8 +230,8 @@ class DumpCommand extends ContainerAwareCommand
              * @var $gfs \Gaufrette\Filesystem
              */
             $files = $gfs->keys();
-            $this->output->writeln('');
             if ($this->output->isVerbose()) {
+                $this->output->writeln('');
                 $subprogress = new ProgressBar($this->output, count($files));
                 $subprogress->setFormat('normal');
                 $subprogress->start();

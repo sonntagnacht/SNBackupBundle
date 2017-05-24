@@ -127,6 +127,11 @@ class RestoreCommand extends ContainerAwareCommand
         CommandHelper::executeCommand($cmd);
     }
 
+    protected function importGaufetteFilesystems(Finder $finder)
+    {
+
+    }
+
     /**
      * @param SplFileInfo $folder
      */
@@ -136,14 +141,47 @@ class RestoreCommand extends ContainerAwareCommand
         $finder->files()->in($folder->getRealPath());
         $gfs = $this->getContainer()->get('knp_gaufrette.filesystem_map')->get($folder->getRelativePathname());
 
+        if ($this->output->isVerbose()) {
+            $this->output->writeln('');
+            $subprogress = new ProgressBar($this->output, count($gfs->keys()));
+            $subprogress->setFormat('normal');
+            $subprogress->start();
+            $subprogress->setRedrawFrequency(count($gfs->keys()) / 100);
+        }
+
         foreach (array_reverse($gfs->keys()) as $file) {
             $gfs->delete($file);
+            if ($this->output->isVerbose()) {
+                $subprogress->advance();
+            }
+        }
+
+        if ($this->output->isVerbose()) {
+            $subprogress->finish();
+            $this->output->write("\x0D");
+            $this->output->write("\x1B[2K");
+        }
+
+        if ($this->output->isVerbose()) {
+            $subprogress = new ProgressBar($this->output, count($finder));
+            $subprogress->setFormat('normal');
+            $subprogress->start();
+            $subprogress->setRedrawFrequency(count($finder) / 100);
         }
 
         foreach ($finder as $file) {
             $pathname = $file->getRelativePathname();
             $content  = $file->getContents();
             $gfs->write($pathname, $content, true);
+            if ($this->output->isVerbose()) {
+                $subprogress->advance();
+            }
+        }
+
+        if ($this->output->isVerbose()) {
+            $subprogress->finish();
+            $this->output->write("\x0D");
+            $this->output->write("\x1B[2K");
         }
     }
 
@@ -222,7 +260,19 @@ class RestoreCommand extends ContainerAwareCommand
         // Gaufrette Filesystem
         $finder = new Finder();
         $finder->in($extractFolder)->exclude(["_databases", "_app"])->depth('== 0');
+        $filesystemAmount = $finder->count();
+
+        $progress = new ProgressBar($output, $filesystemAmount);
+        $progress->setFormat(' %current%/%max% Filesystems --- %message%');
+        $progress->start();
+
         foreach ($finder as $folder) {
+            $progress->advance();
+
+            $progress->setMessage(sprintf("Copy [%s]",
+                $folder));
+            $progress->display();
+
             $this->importGaufretteFilesystem($folder);
         }
 
@@ -278,16 +328,12 @@ class RestoreCommand extends ContainerAwareCommand
      * @param bool $oldVersion
      * @throws ConnectionException
      */
-    protected function importDatabase(SplFileInfo $file, $oldVersion = false)
+    protected function importDatabase(SplFileInfo $file)
     {
-        $filename = explode(".", $file->getFilename());
-        $name     = array_shift($filename);
+        $filename    = explode(".", $file->getFilename());
+        $name        = array_shift($filename);
+        $dbal_string = sprintf('doctrine.dbal.%s_connection', $name);
 
-        if (true === $oldVersion) {
-            $dbal_string = sprintf('doctrine.dbal.%s_connection', Config::get(Config::DATABASES));
-        } else {
-            $dbal_string = sprintf('doctrine.dbal.%s_connection', $name);
-        }
         /**
          * @var $connection Connection
          */
@@ -307,7 +353,11 @@ class RestoreCommand extends ContainerAwareCommand
                             $connection->getPassword(),
                             $connection->getDatabase(),
                             $file->getRealPath());
-                        CommandHelper::executeCommand($cmd, $this->output);
+
+                        CommandHelper::executeCommand($cmd,
+                            $this->output,
+                            sprintf("Import database [%s]", $name));
+
                         $connection->exec('SET foreign_key_checks = 0');
 
                         return;
@@ -321,7 +371,7 @@ class RestoreCommand extends ContainerAwareCommand
         $database    = json_decode($json_string, true);
 
         if (!$connection->isConnected() && !$connection->connect()) {
-            throw new ConnectionException('Database is not connected!');
+            throw new ConnectionException(sprintf('Unable to connect to database [%s]', $name));
         }
 
         $connection->exec('SET foreign_key_checks = 0');
