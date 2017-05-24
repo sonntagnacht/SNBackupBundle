@@ -62,7 +62,6 @@ class DumpCommand extends ContainerAwareCommand
                 InputArgument::OPTIONAL,
                 $backupTypeDescription,
                 Backup::TYPE_DAILY)
-            ->addOption('remote', 'r', InputOption::VALUE_OPTIONAL, 'Take a snapshot from remote Server.')
             ->addOption('full', 'f', InputOption::VALUE_NONE, 'Take a backup with webfolder.')
             ->addOption('current', 'c', InputOption::VALUE_NONE, 'Without saving')
             ->addOption('check-target-fs',
@@ -157,16 +156,6 @@ class DumpCommand extends ContainerAwareCommand
 
         $backup = new Backup();
         $backup->setType($input->getArgument('type'));
-
-        if ($input->getOption('remote') != null) {
-            $env           = $input->getOption('remote');
-            $remoteConfigs = $this->getContainer()->getParameter('sn_deploy.environments');
-            $config        = $remoteConfigs[$env];
-            CommandHelper::executeRemoteCommand('php bin/console sn:backup:dump', $config);
-
-            return;
-        }
-
 
         // Get configs
         $this->fs = new Filesystem();

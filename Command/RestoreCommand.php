@@ -14,7 +14,6 @@ use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\ConnectionException;
 use SN\BackupBundle\Model\Backup;
 use SN\BackupBundle\Model\BackupList;
-use SN\BackupBundle\Model\RemoteBackup;
 use SN\BackupBundle\Model\RemoteBackupList;
 use SN\ToolboxBundle\Helper\CommandHelper;
 use Symfony\Bundle\FrameworkBundle\Command\ContainerAwareCommand;
@@ -61,9 +60,7 @@ class RestoreCommand extends ContainerAwareCommand
         if ($input->getArgument('id') != null) {
             $this->restoreBackup($input->getArgument('id'), $output, $input);
         } else {
-            $backupList = ($input->getOption('remote') == null) ? BackupList::factory() :
-                new RemoteBackupList($input->getOption('remote'), $this->getContainer()
-                    ->getParameter('sn_deploy.environments'));
+            $backupList = BackupList::factory();
             $this->renderList(
                 $output,
                 $backupList
@@ -78,19 +75,6 @@ class RestoreCommand extends ContainerAwareCommand
             $id = $helper->ask($input, $output, $question);
             $this->restoreBackup($id, $output, $input);
         }
-    }
-
-    protected function restoreRemoteBackup($env, $id)
-    {
-    }
-
-
-    protected function getRemoteCurrentBackup($env, $extractFolder)
-    {
-        $remoteConfigs = $this->getContainer()->getParameter('sn_deploy.environments');
-        $config        = $remoteConfigs[$env];
-
-        new RemoteBackup($env, $remoteConfigs[$env], "c");
     }
 
     protected function copyToBackup($archive, $name)
@@ -143,25 +127,6 @@ class RestoreCommand extends ContainerAwareCommand
         CommandHelper::executeCommand($cmd);
     }
 
-    protected function getRemoteBackup($env, $id)
-    {
-
-        $extractFolder = sprintf("%s/../var/sn_backup", $this->getContainer()->get('kernel')->getRootDir());
-        $remoteConfigs = $this->getContainer()->getParameter('sn_deploy.environments');
-
-        return new RemoteBackup($env, $remoteConfigs[$env], $id);
-    }
-
-    protected function getRemoteCurrentConfig($env)
-    {
-        $remoteConfigs = $this->getContainer()->getParameter('sn_deploy.environments');
-        $config        = $remoteConfigs[$env];
-
-        return json_decode(
-            CommandHelper::executeRemoteCommand("php bin/console sn:backup:get c", $config),
-            true);
-    }
-
     /**
      * @param SplFileInfo $folder
      */
@@ -188,26 +153,20 @@ class RestoreCommand extends ContainerAwareCommand
         $fs            = new Filesystem();
 
 
-        if ($input->getOption('remote') == null) {
-            $backupList = BackupList::factory();
-            /**
-             * @var $backup Backup
-             */
-            $backup = $backupList->getDumps()->get($id);
-            if (!$backup) {
-                $formatter      = $this->getHelper('formatter');
-                $errorMessages  = array('', 'Backup not found!', '');
-                $formattedBlock = $formatter->formatBlock($errorMessages, 'error');
-                $output->writeln(array('', $formattedBlock));
+        $backupList = BackupList::factory();
+        /**
+         * @var $backup Backup
+         */
+        $backup = $backupList->getDumps()->get($id);
+        if (!$backup) {
+            $formatter      = $this->getHelper('formatter');
+            $errorMessages  = array('', 'Backup not found!', '');
+            $formattedBlock = $formatter->formatBlock($errorMessages, 'error');
+            $output->writeln(array('', $formattedBlock));
 
-                return;
-            }
-            $backup->extractTo($extractFolder);
-        } else {
-            $backup = $this->getRemoteBackup($input->getOption('remote'), $id, $extractFolder);
-            $backup->extractTo($extractFolder, $this->output);
+            return;
         }
-
+        $backup->extractTo($extractFolder);
         $app_folder = sprintf("%s/_app", $extractFolder);
 
         if ($fs->exists($app_folder)) {
@@ -276,14 +235,6 @@ class RestoreCommand extends ContainerAwareCommand
     protected function getLocalConfig()
     {
         return BackupList::factory();
-    }
-
-    protected function getRemoteConfig($env)
-    {
-        $remoteConfigs = $this->getContainer()->getParameter('sn_deploy.environments');
-        $config        = $remoteConfigs[$env];
-
-        return CommandHelper::executeRemoteCommand("php bin/console sn:backup:get", $config);
     }
 
     /**
