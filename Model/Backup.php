@@ -27,7 +27,7 @@ class Backup implements \JsonSerializable
 
     protected $filename = null;
     protected $version;
-    protected $type     = null;
+    protected $type = null;
     /**
      * @var \DateTime
      */
@@ -197,7 +197,7 @@ class Backup implements \JsonSerializable
         $cmd     = sprintf("cd %s; tar -czf %s *", $srcFolder, $tmpFile);
 
         if ($output instanceof OutputInterface) {
-            CommandHelper::executeCommand($cmd, $output, false, sprintf("Compressing Backup to [%s]", $tmpFile));
+            CommandHelper::executeCommand($cmd, $output, sprintf("Compressing Backup to [%s]", $tmpFile));
             $output->writeln(
                 sprintf('Uploading Backup (%s) to [%s]',
                     DataValueHelper::convertFilesize(filesize($tmpFile)),

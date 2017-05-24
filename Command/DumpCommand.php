@@ -179,20 +179,7 @@ class DumpCommand extends ContainerAwareCommand
                 $root_dir,
                 $this->tempFolder);
 
-            $this->executeCommand($cmd);
-        }
-
-        if ($input->getOption('current')) {
-
-            $currentFolder = sprintf("/tmp/%s", md5($backup->getTimestamp()));
-            $cmd           = sprintf("cp -r %s %s", $this->tempFolder, $currentFolder);
-
-            $this->executeCommand($cmd);
-            $fs->remove($this->tempFolder);
-
-            $this->writeln($currentFolder, true);
-
-            return;
+            CommandHelper::executeCommand($cmd);
         }
 
         $backup->insertFrom($this->tempFolder, $output);
@@ -337,15 +324,6 @@ class DumpCommand extends ContainerAwareCommand
             $connection_name),
             json_encode($tables));
 
-    }
-
-    protected function executeCommand($cmd, $silence = false)
-    {
-        if ($this->input->getOption('current') || $silence) {
-            return CommandHelper::executeCommand($cmd);
-        }
-
-        return CommandHelper::executeCommand($cmd, $this->output);
     }
 
     protected function writeln($message, $force = false)
