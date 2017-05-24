@@ -44,15 +44,18 @@ sn_backup:
 
 ## Usage
 
-Take a snapshot of your current webapplication
+To take a backup of your current webapplication (database and gaufrette filesystems)
 
     php bin/console sn:backup:dump [daily|weekly|monthly|yearly]
 
-Get a list of all snapshots
+For large Backups, we skipped an initial connection check because the connection might get lost until everything is stored in a `tar`
+If you still want a check if the filesystem exists, execute the backup command with `--check-target-fs`
+
+Get a list of all backups
 
     php bin/console sn:backup:restore
 
-Restore a saved snapshot
+Restore a saved backup
 
     php bin/console sn:backup:restore [id]
     
@@ -60,16 +63,6 @@ Delete backups whiche are older than seven days.
 
     php bin/console sn:backup:cleanup [daily|weekly|monthly|yearly] 7d
 
-### Required SNDeployBundle
-
-Get a list of all remote snapshots
-
-    php bin/console sn:backup:restore --remote=[prod|test|dev]
-    
-Download current snapshot of your remote system
-
-    php bin/console sn:backup:restore --remote=[prod|test|dev] c
-    
 ## WebGUI
 
 ![webgui](Resources/doc/web_gui.jpg)

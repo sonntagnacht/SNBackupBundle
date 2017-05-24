@@ -48,7 +48,6 @@ class RestoreCommand extends ContainerAwareCommand
         $this->setName("sn:backup:restore")
             ->setDescription("Restore a backup")
             ->addArgument('id', InputArgument::OPTIONAL, 'Id of backup wich will be restore')
-            ->addOption('remote', 'r', InputOption::VALUE_OPTIONAL, 'To load a remote backup.')
             ->addOption('filter', 'f', InputOption::VALUE_REQUIRED, 'Filter by type');
     }
 

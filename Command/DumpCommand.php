@@ -64,7 +64,11 @@ class DumpCommand extends ContainerAwareCommand
                 Backup::TYPE_DAILY)
             ->addOption('remote', 'r', InputOption::VALUE_OPTIONAL, 'Take a snapshot from remote Server.')
             ->addOption('full', 'f', InputOption::VALUE_NONE, 'Take a backup with webfolder.')
-            ->addOption('current', 'c', InputOption::VALUE_NONE, 'Without saving');
+            ->addOption('current', 'c', InputOption::VALUE_NONE, 'Without saving')
+            ->addOption('check-target-fs',
+                null,
+                InputOption::VALUE_NONE,
+                'If given, the target filesystem will be checked if it is available');
     }
 
     /**
@@ -140,8 +144,10 @@ class DumpCommand extends ContainerAwareCommand
         $gaufretteFs = Config::getGaufretteFs();
         $saveFs      = array();
 
-        // test if backup fs exists
-        Config::getTargetFs();
+        if ($input->getOption('check-target-fs')) {
+            // test if backup fs exists
+            Config::getTargetFs();
+        }
 
         foreach ($gaufretteFs as $fsName) {
             // if given fsName doesnt exist, an InvalidArgumentException will be thrown
@@ -246,10 +252,12 @@ class DumpCommand extends ContainerAwareCommand
              */
             $files = $gfs->keys();
             $this->output->writeln('');
-            $subprogress = new ProgressBar($this->output, count($files));
-            $subprogress->setFormat('normal');
-            $subprogress->start();
-            $subprogress->setRedrawFrequency(count($files) / 100);
+            if ($this->output->isVerbose()) {
+                $subprogress = new ProgressBar($this->output, count($files));
+                $subprogress->setFormat('normal');
+                $subprogress->start();
+                $subprogress->setRedrawFrequency(count($files) / 100);
+            }
 
             foreach ($files as $counter => $file) {
                 if ($gfs->isDirectory($file)) {
@@ -266,11 +274,15 @@ class DumpCommand extends ContainerAwareCommand
                             $file),
                         $data);
                 }
-                $subprogress->advance();
+                if ($this->output->isVerbose()) {
+                    $subprogress->advance();
+                }
             }
-            $subprogress->finish();
-            $this->output->write("\x0D");
-            $this->output->write("\x1B[2K");
+            if ($this->output->isVerbose()) {
+                $subprogress->finish();
+                $this->output->write("\x0D");
+                $this->output->write("\x1B[2K");
+            }
 
         }
         $progress->finish();
