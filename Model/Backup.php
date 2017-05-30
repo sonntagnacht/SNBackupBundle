@@ -4,6 +4,7 @@ namespace SN\BackupBundle\Model;
 
 use Gaufrette\File;
 use SN\ToolboxBundle\Helper\CommandHelper;
+use SN\ToolboxBundle\Helper\CommandLoader;
 use SN\ToolboxBundle\Helper\DataValueHelper;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Filesystem\Filesystem;
@@ -205,19 +206,25 @@ class Backup implements \JsonSerializable
         $cmd     = sprintf("cd %s; tar -czf %s *", $srcFolder, $tmpFile);
 
         if ($output instanceof OutputInterface) {
-            CommandHelper::executeCommand($cmd, $output, sprintf("Compressing Backup to [%s]", $tmpFile));
             $output->writeln(
                 sprintf('Uploading Backup (%s) to [%s]',
                     DataValueHelper::convertFilesize(filesize($tmpFile)),
                     $this->getAbsolutePath()
                 )
             );
+            $cmdLoader = new CommandLoader($output);
+            $cmdLoader->setMessage(sprintf("Compressing Backup to [%s]", $tmpFile));
+            $cmdLoader->run();
+            CommandHelper::executeCommand($cmd);
+            $cmdLoader->setMessage(sprintf("Upload Backup to [%s]", $this->getAbsolutePath()));
+            $gfs = Config::getTargetFs();
+            $gfs->write($this->getAbsolutePath(), file_get_contents($tmpFile), true);
+            $cmdLoader->stop("Done!");
         } else {
             CommandHelper::executeCommand($cmd);
+            $gfs = Config::getTargetFs();
+            $gfs->write($this->getAbsolutePath(), file_get_contents($tmpFile), true);
         }
-
-        $gfs = Config::getTargetFs();
-        $gfs->write($this->getAbsolutePath(), file_get_contents($tmpFile), true);
 
         $fs = new Filesystem();
         $fs->remove($tmpFile);

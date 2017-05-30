@@ -123,7 +123,6 @@ class DumpCommand extends ContainerAwareCommand
     protected function execute(InputInterface $input, OutputInterface $output)
     {
 
-
         $this->input  = $input;
         $this->output = $output;
 

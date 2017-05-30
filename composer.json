@@ -20,9 +20,6 @@
   "require-dev": {
     "phpunit/phpunit": "3.7.*"
   },
-  "suggest": {
-    "sonntagnacht/deploy-bundle": "dev-master"
-  },
   "autoload": {
     "psr-4": {
       "SN\\BackupBundle\\": ""
