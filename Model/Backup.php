@@ -206,17 +206,15 @@ class Backup implements \JsonSerializable
         $cmd     = sprintf("cd %s; tar -czf %s *", $srcFolder, $tmpFile);
 
         if ($output instanceof OutputInterface) {
-            $output->writeln(
-                sprintf('Uploading Backup (%s) to [%s]',
-                    DataValueHelper::convertFilesize(filesize($tmpFile)),
-                    $this->getAbsolutePath()
-                )
-            );
             $cmdLoader = new CommandLoader($output);
             $cmdLoader->setMessage(sprintf("Compressing Backup to [%s]", $tmpFile));
             $cmdLoader->run();
             CommandHelper::executeCommand($cmd);
-            $cmdLoader->setMessage(sprintf("Upload Backup to [%s]", $this->getAbsolutePath()));
+            $cmdLoader->setMessage(
+                sprintf('Uploading Backup (%s) to [%s]',
+                    DataValueHelper::convertFilesize(filesize($tmpFile)),
+                    $this->getAbsolutePath()
+                ));
             $gfs = Config::getTargetFs();
             $gfs->write($this->getAbsolutePath(), file_get_contents($tmpFile), true);
             $cmdLoader->stop("Done!");
