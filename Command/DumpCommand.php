@@ -160,7 +160,9 @@ class DumpCommand extends ContainerAwareCommand
         $this->fs = new Filesystem();
         $fs       = $this->fs;
 
-        $this->tempFolder = $this->createFolder("/tmp/sn_backup", true);
+        $tmpFolder = sprintf("/tmp/%s_%s", $backup->getType(), md5(time()));
+
+        $this->tempFolder = $this->createFolder($tmpFolder, true);
 
 
         $connections = Config::get(Config::DATABASES);
