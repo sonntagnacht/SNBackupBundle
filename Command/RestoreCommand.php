@@ -165,7 +165,7 @@ class RestoreCommand extends ContainerAwareCommand
 
             return;
         }
-        $backup->extractTo($extractFolder);
+        $backup->extractTo($extractFolder, $output);
 
 
         $app_folder = sprintf("%s/_app", $extractFolder);
@@ -308,13 +308,13 @@ class RestoreCommand extends ContainerAwareCommand
                             $connection->getPassword(),
                             $connection->getDatabase(),
                             $file->getRealPath());
-                        CommandHelper::executeCommand($cmd, $this->output);
+                        CommandHelper::executeCommand($cmd);
                         $connection->exec('SET foreign_key_checks = 0');
 
                         return;
                     }
-
                     break;
+                // Todo: other database connections
             }
         }
 

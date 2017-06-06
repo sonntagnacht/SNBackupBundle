@@ -19,6 +19,7 @@ use SN\BackupBundle\Model\Config;
 use SN\DeployBundle\Services\Version;
 use SN\ToolboxBundle\Gaufrette\GaufretteHelper;
 use SN\ToolboxBundle\Helper\CommandHelper;
+use SN\ToolboxBundle\Helper\CommandLoader;
 use SN\ToolboxBundle\Helper\DataValueHelper;
 use Symfony\Bundle\FrameworkBundle\Command\ContainerAwareCommand;
 use Symfony\Component\Console\Helper\ProgressBar;
@@ -166,9 +167,13 @@ class DumpCommand extends ContainerAwareCommand
 
 
         $connections = Config::get(Config::DATABASES);
+        $loader = new CommandLoader($this->output);
+        $loader->setMessage("Export databases")->run();
         foreach ($connections as $connection_name) {
+            $loader->setMessage(sprintf("Export database [%s]", $connection_name));
             $this->dumpDatabase($connection_name);
         }
+        $loader->stop("Export databases finished!");
 
         $this->copyGaufretteFilesystem($saveFs);
 
@@ -292,7 +297,7 @@ class DumpCommand extends ContainerAwareCommand
                         $con->getDatabase(),
                         $destination,
                         $connection_name);
-                    CommandHelper::executeCommand($cmd, $this->output);
+                    CommandHelper::executeCommand($cmd);
 
                     return;
                 }
