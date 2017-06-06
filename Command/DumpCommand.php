@@ -13,6 +13,8 @@ namespace SN\BackupBundle\Command;
 
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\ConnectionException;
+use Gaufrette\FilesystemMap;
+use Psr\Log\LoggerInterface;
 use SN\BackupBundle\Model\Backup;
 use SN\BackupBundle\Model\BackupList;
 use SN\BackupBundle\Model\Config;
@@ -46,6 +48,11 @@ class DumpCommand extends ContainerAwareCommand
     protected $output;
 
     protected $tempFolder;
+
+    /**
+     * @var $logger LoggerInterface
+     */
+    protected $logger;
 
     /**
      * @var $fs Filesystem
@@ -126,6 +133,10 @@ class DumpCommand extends ContainerAwareCommand
 
         $this->input  = $input;
         $this->output = $output;
+        $this->logger = $this->getContainer()->get('logger');
+
+        $this->logger->notice(sprintf("Create backup of type [%s]",
+            $this->input->getArgument('type')));
 
         if (!in_array($this->input->getArgument('type'),
             array(
@@ -135,10 +146,15 @@ class DumpCommand extends ContainerAwareCommand
                 Backup::TYPE_YEARLY
             ))
         ) {
-            throw new \InvalidArgumentException(sprintf('The type [%s] is unknown.',
-                $this->input->getArgument('type')));
+            $msg = sprintf('The type [%s] is unknown.',
+                $this->input->getArgument('type'));
+            $this->logger->error($msg);
+            throw new \InvalidArgumentException($msg);
         }
 
+        /**
+         * @var $gaufrette FilesystemMap
+         */
         $gaufrette   = $this->getContainer()->get('knp_gaufrette.filesystem_map');
         $gaufretteFs = Config::getGaufretteFs();
         $saveFs      = array();
@@ -150,7 +166,13 @@ class DumpCommand extends ContainerAwareCommand
 
         foreach ($gaufretteFs as $fsName) {
             // if given fsName doesnt exist, an InvalidArgumentException will be thrown
-            $saveFs[$fsName] = $gaufrette->get($fsName);
+            try {
+                $saveFs[$fsName] = $gaufrette->get($fsName);
+            } catch (\InvalidArgumentException $exception) {
+                $this->logger->error($exception->getMessage());
+
+                return;
+            }
         }
 
 
@@ -167,10 +189,12 @@ class DumpCommand extends ContainerAwareCommand
 
 
         $connections = Config::get(Config::DATABASES);
-        $loader = new CommandLoader($this->output);
+        $loader      = new CommandLoader($this->output);
         $loader->setMessage("Export databases")->run();
         foreach ($connections as $connection_name) {
-            $loader->setMessage(sprintf("Export database [%s]", $connection_name));
+            $msg = sprintf("Export database [%s]", $connection_name);
+            $loader->setMessage($msg);
+            $this->logger->notice($msg);
             $this->dumpDatabase($connection_name);
         }
         $loader->stop("Export databases finished!");
@@ -188,6 +212,7 @@ class DumpCommand extends ContainerAwareCommand
             CommandHelper::executeCommand($cmd);
         }
 
+        $this->logger->notice("Uploading Backup");
         $backup->insertFrom($this->tempFolder, $output);
         $fs->remove($this->tempFolder);
 
@@ -204,6 +229,8 @@ class DumpCommand extends ContainerAwareCommand
         }
 
         BackupList::factory()->addBackup($backup);
+
+        $this->logger->notice('Backup complete.');
     }
 
     /**
@@ -223,10 +250,12 @@ class DumpCommand extends ContainerAwareCommand
                 $folder));
             $progress->display();
 
-
-            $progress->setMessage(sprintf("Copy [%s] (%s)",
+            $msg = sprintf("Copy [%s] (%s)",
                 $folder,
-                DataValueHelper::convertFilesize(GaufretteHelper::getSize($gfs))));
+                DataValueHelper::convertFilesize(GaufretteHelper::getSize($gfs)));
+
+            $this->logger->notice($msg);
+            $progress->setMessage($msg);
             $progress->display();
 
             $fs->mkdir(sprintf("%s/%s",
