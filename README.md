@@ -67,6 +67,7 @@ Delete backups whiche are older than seven days.
 
 ![webgui](Resources/doc/web_gui.jpg)
 
+To use the webgui add following lines to `routing.yml`
 ```yaml
 SNBackupBundle:
     resource: "@SNBackupBundle/Controller/"
