@@ -46,7 +46,6 @@ class Backup implements \JsonSerializable
          * @var $fs \Gaufrette\Filesystem
          */
         $fs = Config::getTargetFs();
-        dump($this->getAbsolutePath());
         $fs->delete($this->getAbsolutePath());
     }
 

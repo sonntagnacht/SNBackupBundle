@@ -59,7 +59,7 @@ class BackupList implements \JsonSerializable
     public function removeBackup(Backup $backup)
     {
         $this->list->removeElement($backup);
-//        $backup->remove();
+        $backup->remove();
         $this->save();
     }
 
