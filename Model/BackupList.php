@@ -21,6 +21,8 @@ class BackupList implements \JsonSerializable
      */
     private static $instance = null;
 
+    private $type = null;
+
     /**
      * @var array
      */
@@ -28,6 +30,7 @@ class BackupList implements \JsonSerializable
 
     public function __construct($type = null)
     {
+        $this->type = $type;
         $this->list = new ArrayCollection();
 
         if (self::$instance instanceof self) {
@@ -100,7 +103,7 @@ class BackupList implements \JsonSerializable
          * @var $fs \Gaufrette\Filesystem
          */
         $fs = Config::getTargetFs();
-        $fs->write($this->getFilename(), (string) $this, true);
+        $fs->write($this->getFilename(), (string)$this, true);
     }
 
     public function addBackup(Backup $backup)
@@ -116,6 +119,39 @@ class BackupList implements \JsonSerializable
          */
         foreach ($this->list as $backup) {
             if ($backup->getDateTime() == $timestamp) {
+                return $backup;
+            }
+        }
+
+        return false;
+    }
+
+    public function sortByDate()
+    {
+        $iterator = $this->list->getIterator();
+        $iterator->uasort(function ($a, $b) {
+            /**
+             * @var $a Backup
+             * @var $b Backup
+             */
+            return ($a->getTimestamp() < $b->getTimestamp()) ? -1 : 1;
+        });
+
+        $this->list = new ArrayCollection(iterator_to_array($iterator));
+        $this->save();
+    }
+
+    /**
+     * @param string $filename
+     * @return bool|Backup
+     */
+    public function findByFilename($filename)
+    {
+        /**
+         * @var $backup Backup
+         */
+        foreach ($this->list as $backup) {
+            if ($backup->getAbsolutePath() == $filename || $backup->getFile() == $filename) {
                 return $backup;
             }
         }
@@ -154,13 +190,30 @@ class BackupList implements \JsonSerializable
         return $this->list;
     }
 
-    public function jsonSerialize()
+    public function setDumps(ArrayCollection $collection)
+    {
+        $this->list = $collection;
+        $this->save();
+    }
+
+    public
+    function jsonSerialize()
     {
         return $this->list->toArray();
     }
 
-    public function __toString()
+    public
+    function __toString()
     {
         return json_encode($this);
+    }
+
+    /**
+     * @return string
+     */
+    public
+    function getType()
+    {
+        return $this->type;
     }
 }
