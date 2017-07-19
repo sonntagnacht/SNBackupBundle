@@ -28,7 +28,7 @@ class Backup implements \JsonSerializable
 
     protected $filename = null;
     protected $version;
-    protected $type = null;
+    protected $type     = null;
     /**
      * @var \DateTime
      */
@@ -164,7 +164,7 @@ class Backup implements \JsonSerializable
      */
     public function extractTo($dstFolder, OutputInterface $output = null)
     {
-        $tmpFile = sprintf("/tmp/%s.tar.gz", md5(time()));
+        $tmpFile = sprintf("/tmp/sn-backup-%s-%s.tar.gz", $this->getType(), md5(time()));
 
         /**
          * @var $gfs \Gaufrette\Filesystem
@@ -201,7 +201,7 @@ class Backup implements \JsonSerializable
         /**
          * @var $gfs \Gaufrette\Filesystem
          */
-        $tmpFile = sprintf("/tmp/%s.tar.gz", md5(time()));
+        $tmpFile = sprintf("/tmp/sn-backup-%s-%s.tar.gz", $this->getType(), md5(time()));
         $cmd     = sprintf("cd %s; tar -czf %s *", $srcFolder, $tmpFile);
 
         if ($output instanceof OutputInterface) {
