@@ -280,6 +280,12 @@ class DumpCommand extends ContainerAwareCommand
                         $folder,
                         $file));
                 } else {
+
+                    if (false === $gfs->has($file)) {
+                        $this->logger->log(Logger::WARNING, sprintf('File [%s] was not found and can not be backuped'));
+                        continue;
+                    }
+
                     $data = $gfs->read($file);
                     $fs->dumpFile(
                         sprintf("%s/%s/%s",
