@@ -1,4 +1,5 @@
 # SNBackupBundle
+[![Latest Stable Version](https://poser.pugx.org/sonntagnacht/backup-bundle/v/stable.png)](https://packagist.org/packages/sonntagnacht/backup-bundle) [![Total Downloads](https://poser.pugx.org/sonntagnacht/backup-bundle/downloads.png)](https://packagist.org/packages/sonntagnacht/backup-bundle) [![License](https://poser.pugx.org/sonntagnacht/backup-bundle/license)](https://packagist.org/packages/sonntagnacht/backup-bundle)
 
 This BackupBundle can create backups from type daily, weekly, monthly or yearly. It'll save your default database and GaufretteFilesystems to tar.gz-archive in a GaufretteFilesystem.
 
