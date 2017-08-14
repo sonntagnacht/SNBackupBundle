@@ -28,7 +28,7 @@ class Backup implements \JsonSerializable
 
     protected $filename = null;
     protected $version;
-    protected $type     = null;
+    protected $type = null;
     /**
      * @var \DateTime
      */
@@ -46,6 +46,7 @@ class Backup implements \JsonSerializable
          * @var $fs \Gaufrette\Filesystem
          */
         $fs = Config::getTargetFs();
+        $fs->has($this->getAbsolutePath());
         $fs->delete($this->getAbsolutePath());
     }
 
@@ -279,6 +280,11 @@ class Backup implements \JsonSerializable
     public function setType($type)
     {
         $this->type = $type;
+    }
+
+    public function exist()
+    {
+        return $this->getFile()->exists();
     }
 
     public function jsonSerialize()
