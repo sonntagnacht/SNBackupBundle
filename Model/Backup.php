@@ -288,7 +288,11 @@ class Backup implements \JsonSerializable
      */
     public function exist()
     {
-        return ($this->getFile() instanceof File && $this->getFile()->exists());
+        /**
+         * @var $fs \Gaufrette\Filesystem
+         */
+        $fs = Config::getTargetFs();
+        return ($fs->has($this->getAbsolutePath()));
     }
 
     public function jsonSerialize()
