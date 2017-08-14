@@ -46,8 +46,11 @@ class Backup implements \JsonSerializable
          * @var $fs \Gaufrette\Filesystem
          */
         $fs = Config::getTargetFs();
-        $fs->has($this->getAbsolutePath());
-        $fs->delete($this->getAbsolutePath());
+        if ($fs->has($this->getAbsolutePath())) {
+            return $fs->delete($this->getAbsolutePath());
+        }
+
+        return false;
     }
 
     public function getAbsolutePath()
@@ -114,14 +117,12 @@ class Backup implements \JsonSerializable
         /**
          * @var $fs \Gaufrette\Filesystem
          */
-        $fs   = Config::getTargetFs();
-        $file = $fs->get($this->getAbsolutePath());
-
-        if ($file->exists() === false) {
-            return false;
+        $fs = Config::getTargetFs();
+        if ($fs->has($this->getAbsolutePath())) {
+            return $fs->get($this->getAbsolutePath());
         }
 
-        return $file;
+        return false;
     }
 
     /**
@@ -282,9 +283,12 @@ class Backup implements \JsonSerializable
         $this->type = $type;
     }
 
+    /**
+     * @return bool
+     */
     public function exist()
     {
-        return $this->getFile()->exists();
+        return ($this->getFile() instanceof File);
     }
 
     public function jsonSerialize()
