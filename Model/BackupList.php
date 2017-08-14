@@ -28,10 +28,16 @@ class BackupList implements \JsonSerializable
      */
     protected $list = array();
 
+    /**
+     * @var array
+     */
+    protected $storage = array();
+
     public function __construct($type = null)
     {
-        $this->type = $type;
-        $this->list = new ArrayCollection();
+        $this->storage = new ArrayCollection();
+        $this->type    = $type;
+        $this->list    = new ArrayCollection();
 
         if (self::$instance instanceof self) {
             return self::$instance;
@@ -44,16 +50,17 @@ class BackupList implements \JsonSerializable
         $json_data = $this->getFile()->getContent();
         $json_data = json_decode($json_data, true);
         foreach ($json_data as $k => $v) {
-            if (isset($v["type"]) && $type != null && $type != $v["type"]) {
-                continue;
-            }
-
             $backup = new Backup();
             $backup->setTimestamp($v["timestamp"]);
             $backup->setVersion($v["version"]);
             $backup->setCommit($v["commit"]);
+
+            $this->storage->add($backup);
             if (isset($v["type"])) {
                 $backup->setType($v["type"]);
+                if (isset($v["type"]) && $type != null && $type != $v["type"]) {
+                    continue;
+                }
             }
             $this->list->add($backup);
         }
@@ -62,6 +69,7 @@ class BackupList implements \JsonSerializable
     public function removeBackup(Backup $backup)
     {
         $this->list->removeElement($backup);
+        $this->storage->removeElement($backup);
         $backup->remove();
         $this->save();
     }
@@ -109,6 +117,7 @@ class BackupList implements \JsonSerializable
     public function addBackup(Backup $backup)
     {
         $this->list->add($backup);
+        $this->storage->add($backup);
         $this->save();
     }
 
@@ -192,14 +201,15 @@ class BackupList implements \JsonSerializable
 
     public function setDumps(ArrayCollection $collection)
     {
-        $this->list = $collection;
+        $this->list    = $collection;
+        $this->storage = $collection;
         $this->save();
     }
 
     public
     function jsonSerialize()
     {
-        return $this->list->toArray();
+        return $this->storage->toArray();
     }
 
     public
@@ -211,8 +221,7 @@ class BackupList implements \JsonSerializable
     /**
      * @return string
      */
-    public
-    function getType()
+    public function getType()
     {
         return $this->type;
     }
