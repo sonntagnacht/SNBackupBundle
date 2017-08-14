@@ -47,38 +47,34 @@ class RebuildCommand extends ContainerAwareCommand
          * @var $fs \Gaufrette\Filesystem
          */
         $this->fs   = Config::getTargetFs();
-        $backupList = BackupList::factory();
+        $backupList = new BackupList(null, true);
         $this->checkKnownBackups($backupList);
-
-        foreach ($backupTypes as $type) {
-            $files = $this->fs->listKeys($type)["keys"];
-            foreach ($files as $file) {
-                if (false === $backupList->findByFilename($file) instanceof Backup) {
-                    $matches = array();
-                    preg_match('/[0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{2}-[0-9]{2}/', $file, $matches);
-                    $datetime = \DateTime::createFromFormat("Y-m-d_H-i", $matches[0]);
-                    $backup = new Backup();
-                    $backup->setType($type);
-                    $backup->setDateTime($datetime);
-                    $backupList->addBackup($backup);
-                }
-            }
-        }
-
-        $backupList->sortByDate();
-
     }
 
     protected function checkKnownBackups(BackupList $backupList)
     {
         $updatedBackups = new ArrayCollection();
-        $files          = $this->fs->listKeys()["keys"];
-        foreach ($backupList->getDumps() as $backup) {
-            if (in_array($backup->getAbsolutePath(), $files)) {
-                $updatedBackups->add($backup);
+
+        $types = array(
+            Backup::TYPE_DAILY,
+            Backup::TYPE_MONTHLY,
+            Backup::TYPE_WEEKLY,
+            Backup::TYPE_YEARLY
+        );
+
+        foreach ($types as $type) {
+            $files = $this->fs->listKeys($type);
+            foreach ($files['keys'] as $file) {
+                list($year, $month, $day, $hour, $minute) = sscanf($file, $type . '/%d-%d-%d_%d-%d.tar.gz');
+
+                $backup = new Backup();
+                $backup->setType($type);
+                $timestamp = mktime($hour, $minute, 0, $month, $day, $year);
+                $backup->setTimestamp($timestamp);
+                $backupList->addBackup($backup);
             }
         }
-        $backupList->setDumps($updatedBackups);
+
     }
 
 }

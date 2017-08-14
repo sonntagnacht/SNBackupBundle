@@ -33,36 +33,38 @@ class BackupList implements \JsonSerializable
      */
     protected $storage = array();
 
-    public function __construct($type = null)
+    public function __construct($type = null, $clean = false)
     {
         $this->storage = new ArrayCollection();
         $this->type    = $type;
         $this->list    = new ArrayCollection();
 
-        if (self::$instance instanceof self) {
-            return self::$instance;
-        }
-
-        if ($this->getFile() == false) {
-            return $this;
-        }
-
-        $json_data = $this->getFile()->getContent();
-        $json_data = json_decode($json_data, true);
-        foreach ($json_data as $k => $v) {
-            $backup = new Backup();
-            $backup->setTimestamp($v["timestamp"]);
-            $backup->setVersion($v["version"]);
-            $backup->setCommit($v["commit"]);
-
-            $this->storage->add($backup);
-            if (isset($v["type"])) {
-                $backup->setType($v["type"]);
-                if (isset($v["type"]) && $type != null && $type != $v["type"]) {
-                    continue;
-                }
+        if (false === $clean) {
+            if (self::$instance instanceof self) {
+                return self::$instance;
             }
-            $this->list->add($backup);
+
+            if ($this->getFile() == false) {
+                return $this;
+            }
+
+            $json_data = $this->getFile()->getContent();
+            $json_data = json_decode($json_data, true);
+            foreach ($json_data as $k => $v) {
+                $backup = new Backup();
+                $backup->setTimestamp($v["timestamp"]);
+                $backup->setVersion($v["version"]);
+                $backup->setCommit($v["commit"]);
+
+                $this->storage->add($backup);
+                if (isset($v["type"])) {
+                    $backup->setType($v["type"]);
+                    if (isset($v["type"]) && $type != null && $type != $v["type"]) {
+                        continue;
+                    }
+                }
+                $this->list->add($backup);
+            }
         }
     }
 
