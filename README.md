@@ -2,6 +2,10 @@
 
 This BackupBundle can create backups from type daily, weekly, monthly or yearly. It'll save your default database and GaufretteFilesystems to tar.gz-archive in a GaufretteFilesystem.
 
+## Installtion
+
+Run `composer require sonntagnacht/backup-bundle` to use SNBackupBundle in your Project.
+
 ## Configuration
 
 Add to `AppKernel.php`
