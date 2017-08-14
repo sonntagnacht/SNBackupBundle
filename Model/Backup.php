@@ -288,7 +288,7 @@ class Backup implements \JsonSerializable
      */
     public function exist()
     {
-        return ($this->getFile() instanceof File);
+        return ($this->getFile() instanceof File && $this->getFile()->exists());
     }
 
     public function jsonSerialize()
