@@ -14,6 +14,7 @@ namespace SN\BackupBundle\Command;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\ConnectionException;
 use Gaufrette\FilesystemMap;
+use Monolog\Logger;
 use Psr\Log\LoggerInterface;
 use SN\BackupBundle\Model\Backup;
 use SN\BackupBundle\Model\BackupList;
@@ -264,10 +265,10 @@ class DumpCommand extends ContainerAwareCommand
             /**
              * @var $gfs \Gaufrette\Filesystem
              */
-            $files = $gfs->keys();
+            $files       = $gfs->keys();
+            $subprogress = new ProgressBar($this->output, count($files));
             if ($this->output->isVerbose()) {
                 $this->output->writeln('');
-                $subprogress = new ProgressBar($this->output, count($files));
                 $subprogress->setFormat('normal');
                 $subprogress->start();
                 $subprogress->setRedrawFrequency(count($files) / 100);
@@ -282,7 +283,8 @@ class DumpCommand extends ContainerAwareCommand
                 } else {
 
                     if (false === $gfs->has($file)) {
-                        $this->logger->log(Logger::WARNING, sprintf('File [%s] was not found and can not be backuped'));
+                        $this->logger->log(Logger::WARNING,
+                            sprintf('File [%s] was not found and can not be backuped', $file));
                         continue;
                     }
 
