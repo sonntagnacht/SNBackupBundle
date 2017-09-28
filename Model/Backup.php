@@ -190,9 +190,16 @@ class Backup implements \JsonSerializable
         );
 
         if ($output instanceof OutputInterface) {
-            CommandHelper::executeCommand($cmd, $output);
+            CommandHelper::execute($cmd,
+                array(
+                    "output"       => $output,
+                    "idle_timeout" => 1800
+                ));
         } else {
-            CommandHelper::executeCommand($cmd);
+            CommandHelper::execute($cmd,
+                array(
+                    "idle_timeout" => 1800
+                ));
         }
 
         $fs->remove($tmpFile);
@@ -210,7 +217,10 @@ class Backup implements \JsonSerializable
             $cmdLoader = new CommandLoader($output);
             $cmdLoader->setMessage(sprintf("Compressing Backup to [%s]", $tmpFile));
             $cmdLoader->run();
-            CommandHelper::executeCommand($cmd);
+            CommandHelper::execute($cmd,
+                array(
+                    'idle_timeout' => 1800
+                ));
             $cmdLoader->setMessage(
                 sprintf('Uploading Backup (%s) to [%s]',
                     DataValueHelper::convertFilesize(filesize($tmpFile)),
@@ -220,7 +230,10 @@ class Backup implements \JsonSerializable
             $gfs->write($this->getAbsolutePath(), file_get_contents($tmpFile), true);
             $cmdLoader->stop("Done!");
         } else {
-            CommandHelper::executeCommand($cmd);
+            CommandHelper::execute($cmd,
+                array(
+                    'idle_timeout' => 1800
+                ));
             $gfs = Config::getTargetFs();
             $gfs->write($this->getAbsolutePath(), file_get_contents($tmpFile), true);
         }
@@ -292,6 +305,7 @@ class Backup implements \JsonSerializable
          * @var $fs \Gaufrette\Filesystem
          */
         $fs = Config::getTargetFs();
+
         return ($fs->has($this->getAbsolutePath()));
     }
 
