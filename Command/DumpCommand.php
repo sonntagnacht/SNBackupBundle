@@ -39,6 +39,8 @@ class DumpCommand extends ContainerAwareCommand
     protected static $buInformations;
     protected static $dump;
     protected static $configs;
+    protected static $tmpFolder = "/tmp/sn-backup";
+
     /**
      * @var $input InputInterface
      */
@@ -131,6 +133,8 @@ class DumpCommand extends ContainerAwareCommand
 
     protected function execute(InputInterface $input, OutputInterface $output)
     {
+        $fs = new Filesystem();
+        $fs->mkdir(self::$tmpFolder);
 
         $this->input  = $input;
         $this->output = $output;
@@ -184,7 +188,7 @@ class DumpCommand extends ContainerAwareCommand
         $this->fs = new Filesystem();
         $fs       = $this->fs;
 
-        $tmpFolder = sprintf("/tmp/%s_%s", $backup->getType(), md5(time()));
+        $tmpFolder = sprintf("%s/%s_%s", self::$tmpFolder, $backup->getType(), md5(time()));
 
         $this->tempFolder = $this->createFolder($tmpFolder, true);
 

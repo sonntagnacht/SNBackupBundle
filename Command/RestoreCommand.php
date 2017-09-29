@@ -30,6 +30,9 @@ use Symfony\Component\Finder\SplFileInfo;
 
 class RestoreCommand extends ContainerAwareCommand
 {
+
+    protected static $tmpFolder = "/tmp/sn-backup";
+
     protected static $configs;
     /**
      * @var OutputInterface
@@ -99,7 +102,7 @@ class RestoreCommand extends ContainerAwareCommand
     protected function copyFromBackup($archiveName, $extractFolder)
     {
         $backupArchive = sprintf("%s/%s", self::$configs["backup_folder"], $archiveName);
-        $tempArchive   = sprintf("%s/%s", "/tmp", $archiveName);
+        $tempArchive   = sprintf("%s/%s", self::$tmpFolder, $archiveName);
 
         try {
             /**
