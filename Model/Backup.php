@@ -8,6 +8,7 @@ use SN\ToolboxBundle\Helper\CommandLoader;
 use SN\ToolboxBundle\Helper\DataValueHelper;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\Stopwatch\Stopwatch;
 
 /**
  * SNBundle
@@ -218,10 +219,16 @@ class Backup implements \JsonSerializable
             $cmdLoader = new CommandLoader($output);
             $cmdLoader->setMessage(sprintf("Compressing Backup to [%s]", $tmpFile));
             $cmdLoader->run();
+            $stopwatch = new Stopwatch();
+            $stopwatch->start('compress');
             CommandHelper::execute($cmd,
                 array(
                     'idle_timeout' => 1800
                 ));
+            $event = $stopwatch->stop('compress');
+            if ($output->isVeryVerbose()) {
+                $output->writeln(sprintf("Compression takes %d seconds.", round($event->getDuration() / 1000), 0));
+            }
             $cmdLoader->setMessage(
                 sprintf('Uploading Backup (%s) to [%s]',
                     DataValueHelper::convertFilesize(filesize($tmpFile)),
