@@ -226,7 +226,7 @@ class Backup implements \JsonSerializable
                     'idle_timeout' => 1800
                 ));
             $event = $stopwatch->stop('compress');
-            if ($output->isVeryVerbose()) {
+            if ($output->isDebug()) {
                 $output->writeln(sprintf("Compression takes %d seconds.", round($event->getDuration() / 1000), 0));
             }
             $cmdLoader->setMessage(
