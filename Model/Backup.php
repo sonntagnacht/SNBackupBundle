@@ -36,11 +36,44 @@ class Backup implements \JsonSerializable
      */
     protected $dateTime;
     protected $commit;
+    protected $backupFolder;
+    protected $filesystem;
 
     public function __construct()
     {
-        $this->dateTime = new \DateTime();
+        $this->dateTime     = new \DateTime();
+        $this->backupFolder = sprintf("%s/%s", self::$tmpFolder, $this->dateTime->format("yymmddHHiiss"));
+
+        $this->filesystem = new Filesystem();
+        $this->filesystem->mkdir($this->backupFolder, 0700);
     }
+
+    public function __destruct()
+    {
+        $this->filesystem->remove($this->backupFolder);
+    }
+
+    public function addFilesFrom(array $filesystems)
+    {
+
+    }
+
+    public function addDatabases(array $databases)
+    {
+
+    }
+
+    public function getArchiveName()
+    {
+        return $this->dateTime->format("YYYY-mmm-dd_HH-ii-ss");
+    }
+
+    public function getTempFolder()
+    {
+        return $this->backupFolder;
+    }
+
+    /* ----------- */
 
     public function remove()
     {
@@ -170,15 +203,13 @@ class Backup implements \JsonSerializable
     {
         $tmpFile = sprintf("%s/sn-backup-%s-%s.tar.gz", self::$tmpFolder, $this->getType(), md5(time()));
 
-        /**
-         * @var $gfs \Gaufrette\Filesystem
-         */
-        $gfs = Config::getTargetFs();
-        $fs  = new Filesystem();
+        $fs = new Filesystem();
         if ($output instanceof OutputInterface) {
             $output->writeln(sprintf("Downloading Backup (%s) to [%s]", $this->getAbsolutePath(), $dstFolder));
         }
-        $fs->dumpFile($tmpFile, $gfs->read($this->getAbsolutePath()));
+
+        copy($this->getGaufrettePath(), $tmpFile);
+
         try {
             $fs->remove($dstFolder);
         } catch (\Exception $e) {
@@ -272,6 +303,11 @@ class Backup implements \JsonSerializable
     public function setTimestamp($timestamp)
     {
         $this->dateTime = \DateTime::createFromFormat('U', $timestamp);
+    }
+
+    public function getGaufrettePath()
+    {
+        return sprintf("gaufrette://%s/%s", Config::get(Config::TARGET_FS), $this->getAbsolutePath());
     }
 
     /**
