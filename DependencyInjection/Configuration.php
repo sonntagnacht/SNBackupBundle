@@ -22,6 +22,7 @@ class Configuration implements ConfigurationInterface
 
         $rootNode->children()
             ->scalarNode('target_fs')->end()
+            ->integerNode('timeout')->defaultValue(1800)->end()
             ->arrayNode('databases')->prototype('scalar')->end()->end()
             ->arrayNode('include_fs')->prototype('scalar')->end()->end()
             ->end();

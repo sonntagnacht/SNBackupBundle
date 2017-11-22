@@ -12,13 +12,13 @@ namespace SN\BackupBundle\Model;
 
 
 use Knp\Bundle\GaufretteBundle\FilesystemMap;
-use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\Filesystem\Filesystem;
 
 class Config
 {
 
     const TARGET_FS  = "target_fs";
+    const TIMEOUT    = "timeout";
     const DATABASES  = "databases";
     const FILESYSTEM = "filesystem";
     const INCLUDE_FS = "include_fs";
@@ -68,6 +68,11 @@ class Config
     public static function getGaufretteFs()
     {
         return self::get(self::INCLUDE_FS);
+    }
+
+    public static function getTimeout()
+    {
+        return self::get(self::TIMEOUT);
     }
 
 

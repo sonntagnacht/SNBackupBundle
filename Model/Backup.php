@@ -195,12 +195,12 @@ class Backup implements \JsonSerializable
             CommandHelper::execute($cmd,
                 array(
                     "output"       => $output,
-                    "idle_timeout" => 1800
+                    "idle_timeout" => Config::getTimeout()
                 ));
         } else {
             CommandHelper::execute($cmd,
                 array(
-                    "idle_timeout" => 1800
+                    "idle_timeout" => Config::getTimeout()
                 ));
         }
 
@@ -223,7 +223,7 @@ class Backup implements \JsonSerializable
             $stopwatch->start('compress');
             CommandHelper::execute($cmd,
                 array(
-                    'idle_timeout' => 1800
+                    'idle_timeout' => Config::getTimeout()
                 ));
             $event = $stopwatch->stop('compress');
             if ($output->isDebug()) {
@@ -240,7 +240,7 @@ class Backup implements \JsonSerializable
         } else {
             CommandHelper::execute($cmd,
                 array(
-                    'idle_timeout' => 1800
+                    'idle_timeout' => Config::getTimeout()
                 ));
             $gfs = Config::getTargetFs();
             $gfs->write($this->getAbsolutePath(), file_get_contents($tmpFile), true);
