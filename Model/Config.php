@@ -48,7 +48,7 @@ class Config
     }
 
     /**
-     * @return \Gaufrette\Filesystem
+     * @return \Gaufrette\Filesystem|Filesystem
      */
     public static function getTargetFs()
     {
