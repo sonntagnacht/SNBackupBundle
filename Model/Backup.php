@@ -30,7 +30,7 @@ class Backup implements \JsonSerializable
 
     protected $filename = null;
     protected $version;
-    protected $type = null;
+    protected $type     = null;
     /**
      * @var \DateTime
      */
@@ -69,9 +69,8 @@ class Backup implements \JsonSerializable
         return sprintf("%s.tar.gz", $this->filename);
     }
 
-    public function archive_exists()
+    public function exists()
     {
-
         /**
          * @var $fs \Gaufrette\Filesystem
          */
@@ -302,20 +301,6 @@ class Backup implements \JsonSerializable
     public function setType($type)
     {
         $this->type = $type;
-    }
-
-    /**
-     * @return bool
-     */
-    public function exist()
-    {
-        if (false === $handler = fopen($this->getAbsolutePath(Config::getFilesystem()), 'r')) {
-            return false;
-        }
-
-        fclose($handler);
-
-        return true;
     }
 
     public function jsonSerialize()

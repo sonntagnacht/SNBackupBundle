@@ -255,7 +255,7 @@ class RestoreCommand extends ContainerAwareCommand
                     continue;
                 }
                 $backup->addRow(array(
-                    ($dump->exist() ? $id : "<error> x </error>"),
+                    ($dump->exists() ? $id : "<error> x </error>"),
                     date("Y-m-d H-i", $dump->getTimestamp()),
                     $dump->getType(),
                     $dump->getVersion(),
