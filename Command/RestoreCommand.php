@@ -93,9 +93,9 @@ class RestoreCommand extends ContainerAwareCommand
                 file_get_contents($archive),
                 true
             );
-            CommandHelper::executeCommand(sprintf("rm -rf %s", $archive));
+            CommandHelper::execute(sprintf("rm -rf %s", $archive));
         } catch (\InvalidArgumentException $exception) {
-            CommandHelper::executeCommand(sprintf("mv %s %s", $archive, self::$configs["backup_folder"]));
+            CommandHelper::execute(sprintf("mv %s %s", $archive, self::$configs["backup_folder"]));
         }
     }
 
@@ -119,14 +119,14 @@ class RestoreCommand extends ContainerAwareCommand
             $fs = new Filesystem();
             $fs->dumpFile($tempArchive, $data);
         } catch (\InvalidArgumentException $exception) {
-            CommandHelper::executeCommand(sprintf("cp %s %s", $backupArchive, $tempArchive));
+            CommandHelper::execute(sprintf("cp %s %s", $backupArchive, $tempArchive));
         }
 
         $cmd = sprintf("tar xfz %s -C %s",
             $tempArchive,
             $extractFolder
         );
-        CommandHelper::executeCommand($cmd);
+        CommandHelper::execute($cmd);
     }
 
     /**
@@ -187,14 +187,14 @@ class RestoreCommand extends ContainerAwareCommand
                 '/^(y)/i');
 
             if ($helper->ask($input, $output, $question)) {
-                CommandHelper::executeCommand($cmd);
+                CommandHelper::execute($cmd);
             }
         }
 
         $cmd = "git rev-parse --is-inside-work-tree";
 
         // git reset
-        if ($backup->getCommit() != null && CommandHelper::executeCommand($cmd)) {
+        if ($backup->getCommit() != null && CommandHelper::execute($cmd)) {
             $helper   = $this->getHelper('question');
             $cmd      = sprintf("git reset --hard %s", $backup->getCommit());
             $question = new ConfirmationQuestion(
@@ -205,7 +205,7 @@ class RestoreCommand extends ContainerAwareCommand
                 '/^(y)/i');
 
             if ($helper->ask($input, $output, $question)) {
-                CommandHelper::executeCommand($cmd);
+                CommandHelper::execute($cmd);
             }
         }
 
@@ -303,7 +303,7 @@ class RestoreCommand extends ContainerAwareCommand
         if ($file->getExtension() == "sql") {
             switch ($driver) {
                 case 'Doctrine\DBAL\Driver\PDOMySql\Driver':
-                    if (CommandHelper::executeCommand("which mysql")) {
+                    if (CommandHelper::execute("which mysql")) {
                         $cmd = sprintf("mysql -h %s -u %s -P %s --password='%s' %s < %s",
                             $connection->getHost(),
                             $connection->getUsername(),
@@ -311,7 +311,7 @@ class RestoreCommand extends ContainerAwareCommand
                             $connection->getPassword(),
                             $connection->getDatabase(),
                             $file->getRealPath());
-                        CommandHelper::executeCommand($cmd);
+                        CommandHelper::execute($cmd);
                         $connection->exec('SET foreign_key_checks = 0');
 
                         return;
@@ -338,11 +338,11 @@ class RestoreCommand extends ContainerAwareCommand
 
         $cmd = sprintf("php %s/../bin/console doctrine:schema:create",
             $this->getContainer()->get('kernel')->getRootDir());
-        CommandHelper::executeCommand($cmd);
+        CommandHelper::execute($cmd);
 
         $cmd = sprintf("php %s/../bin/console doctrine:migrations:status",
             $this->getContainer()->get('kernel')->getRootDir());
-        CommandHelper::executeCommand($cmd);
+        CommandHelper::execute($cmd);
 
         $tables = count($database);
 

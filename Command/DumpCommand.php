@@ -214,7 +214,7 @@ class DumpCommand extends ContainerAwareCommand
                 $root_dir,
                 $this->tempFolder);
 
-            CommandHelper::executeCommand($cmd);
+            CommandHelper::execute($cmd);
         }
 
         $this->logger->notice("Uploading Backup");
@@ -329,7 +329,7 @@ class DumpCommand extends ContainerAwareCommand
 
         switch ($driver) {
             case 'Doctrine\DBAL\Driver\PDOMySql\Driver':
-                if (CommandHelper::executeCommand("which mysqldump")) {
+                if (CommandHelper::execute("which mysqldump")) {
                     $cmd = sprintf("mysqldump --single-transaction=TRUE --quick -h %s -u %s -P %s --password='%s' %s > %s/%s.sql",
                         $con->getHost(),
                         $con->getUsername(),
@@ -338,7 +338,7 @@ class DumpCommand extends ContainerAwareCommand
                         $con->getDatabase(),
                         $destination,
                         $connection_name);
-                    CommandHelper::executeCommand($cmd);
+                    CommandHelper::execute($cmd);
 
                     return;
                 }

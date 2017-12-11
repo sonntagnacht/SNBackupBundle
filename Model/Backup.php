@@ -30,7 +30,7 @@ class Backup implements \JsonSerializable
 
     protected $filename = null;
     protected $version;
-    protected $type     = null;
+    protected $type = null;
     /**
      * @var \DateTime
      */
@@ -194,11 +194,13 @@ class Backup implements \JsonSerializable
             CommandHelper::execute($cmd,
                 array(
                     "output"       => $output,
+                    'timeout'      => Config::getTimeout(),
                     "idle_timeout" => Config::getTimeout()
                 ));
         } else {
             CommandHelper::execute($cmd,
                 array(
+                    'timeout'      => Config::getTimeout(),
                     "idle_timeout" => Config::getTimeout()
                 ));
         }
@@ -222,6 +224,7 @@ class Backup implements \JsonSerializable
             $stopwatch->start('compress');
             CommandHelper::execute($cmd,
                 array(
+                    'timeout'      => Config::getTimeout(),
                     'idle_timeout' => Config::getTimeout()
                 ));
             $event = $stopwatch->stop('compress');
@@ -239,6 +242,7 @@ class Backup implements \JsonSerializable
         } else {
             CommandHelper::execute($cmd,
                 array(
+                    'timeout'      => Config::getTimeout(),
                     'idle_timeout' => Config::getTimeout()
                 ));
             $gfs = Config::getTargetFs();
