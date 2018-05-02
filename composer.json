@@ -14,7 +14,7 @@
   "require": {
     "php": ">=5.6",
     "knplabs/knp-gaufrette-bundle": "~0.3",
-    "symfony/framework-standard-edition": ">=2.8.0",
+    "symfony/framework-standard-edition": "^2.8|3.*",
     "sonntagnacht/toolbox-bundle": "^0.2"
   },
   "require-dev": {
