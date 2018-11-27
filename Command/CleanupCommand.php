@@ -77,6 +77,8 @@ class CleanupCommand extends ContainerAwareCommand
         }
 
         if ($backupRemove->count() == 0) {
+            $output->writeln(sprintf('[%s] no backups found that should be removed', $type));
+
             return;
         }
 
