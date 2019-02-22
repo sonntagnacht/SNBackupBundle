@@ -12,6 +12,7 @@ namespace SN\BackupBundle\Command;
 
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\ConnectionException;
+use MongoDB\Driver\Command;
 use SN\BackupBundle\Model\Backup;
 use SN\BackupBundle\Model\BackupList;
 use SN\ToolboxBundle\Helper\CommandHelper;
@@ -181,12 +182,13 @@ class RestoreCommand extends ContainerAwareCommand
                 $root_folder);
             $question    = new ConfirmationQuestion(
                 sprintf(
-                    'Do you want restore your webfolder [y/N]? ',
+                    "Backup of SourceCode found. Do you want restore your the application's SourceCode [y/N]? Please make a manual backup before.\n",
                     $cmd)
                 , false,
                 '/^(y)/i');
 
             if ($helper->ask($input, $output, $question)) {
+                CommandHelper::countdown($output, 10);
                 CommandHelper::execute($cmd);
             }
         }
@@ -304,6 +306,7 @@ class RestoreCommand extends ContainerAwareCommand
             switch ($driver) {
                 case 'Doctrine\DBAL\Driver\PDOMySql\Driver':
                     if (CommandHelper::execute("which mysql")) {
+                        $this->output->writeln(sprintf('Importing Database to [%s]', $connection->getDatabase()));
                         $cmd = sprintf("mysql -h %s -u %s -P %s --password='%s' %s < %s",
                             $connection->getHost(),
                             $connection->getUsername(),
