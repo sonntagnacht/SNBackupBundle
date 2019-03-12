@@ -12,7 +12,6 @@ namespace SN\BackupBundle\Command;
 
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\ConnectionException;
-use MongoDB\Driver\Command;
 use SN\BackupBundle\Model\Backup;
 use SN\BackupBundle\Model\BackupList;
 use SN\ToolboxBundle\Helper\CommandHelper;
